@@ -119,14 +119,6 @@ function FacultyInterface({
             <div>AskMyFaculty</div>
             <div className="portal-subtag faculty-tag">Faculty Portal</div>
           </div>
-          <button
-            type="button"
-            className="sidebar-close-btn"
-            onClick={() => setSidebarVisible(false)}
-            title="Hide Sidebar"
-          >
-            ✕
-          </button>
         </div>
 
         <div className="faculty-identity-box">

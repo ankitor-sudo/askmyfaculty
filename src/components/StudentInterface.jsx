@@ -88,14 +88,6 @@ function StudentInterface({
             <div>AskMyFaculty</div>
             <div className="portal-subtag student-tag">Student Portal</div>
           </div>
-          <button
-            type="button"
-            className="sidebar-close-btn"
-            onClick={() => setSidebarVisible(false)}
-            title="Hide Sidebar"
-          >
-            ✕
-          </button>
         </div>
 
         <p className="menu-label">WORKSPACE</p>
