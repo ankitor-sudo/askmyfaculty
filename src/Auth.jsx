@@ -10,8 +10,11 @@ import { allFaculty } from "./subjectFaculty";
 import "./Auth.css";
 
 function Auth() {
+  // Step 1: role selection; Step 2: form
+  const [step, setStep] = useState("role"); // "role" | "form"
+  const [role, setRole] = useState(""); // "student" | "faculty"
   const [isRegister, setIsRegister] = useState(false);
-  const [role, setRole] = useState("student"); // "student" or "faculty"
+
   const [selectedFacultyProfile, setSelectedFacultyProfile] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,23 +24,30 @@ function Auth() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleRoleSelect = (newRole) => {
-    setRole(newRole);
+  /* ── Handlers ── */
+
+  const handleRoleChoose = (chosenRole) => {
+    setRole(chosenRole);
     setError("");
-    if (newRole === "faculty" && allFaculty.length > 0 && !name) {
-      setSelectedFacultyProfile(allFaculty[0]);
-      setName(allFaculty[0]);
-    }
+    setStep("form");
+  };
+
+  const handleBack = () => {
+    setStep("role");
+    setRole("");
+    setError("");
+    setName("");
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setSelectedFacultyProfile("");
   };
 
   const handleFacultyProfileChange = (e) => {
     const val = e.target.value;
     setSelectedFacultyProfile(val);
-    if (val && val !== "custom") {
-      setName(val);
-    } else if (val === "custom") {
-      setName("");
-    }
+    if (val && val !== "custom") setName(val);
+    else if (val === "custom") setName("");
   };
 
   const handleSubmit = async (e) => {
@@ -45,160 +55,194 @@ function Auth() {
     setError("");
 
     if (isRegister) {
-      if (password !== confirmPassword) {
-        setError("Passwords do not match.");
-        return;
-      }
-      if (password.length < 6) {
-        setError("Password must contain at least 6 characters.");
-        return;
-      }
-      if (!name.trim()) {
-        setError("Please enter your name.");
-        return;
-      }
+      if (!name.trim()) { setError("Please enter your name."); return; }
+      if (password !== confirmPassword) { setError("Passwords do not match."); return; }
+      if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     }
 
     try {
       setLoading(true);
 
       if (isRegister) {
-        // 1. Create Firebase Auth account
-        const result = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-
-        // 2. Save display name
-        await updateProfile(result.user, {
-          displayName: name.trim()
-        });
-
-        // 3. Save user profile in Firestore with role
-        const finalFacultyName = role === "faculty" ? name.trim() : null;
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(result.user, { displayName: name.trim() });
         await setDoc(doc(db, "users", result.user.uid), {
           uid: result.user.uid,
           name: name.trim(),
           email: email.trim(),
-          role: role,
-          facultyName: finalFacultyName,
+          role,
+          facultyName: role === "faculty" ? name.trim() : null,
           department: role === "faculty" ? department : null,
           createdAt: serverTimestamp()
         });
       } else {
-        // Login existing user
-        await signInWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+        await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      console.error("Authentication error:", err);
-      let msg = err.message;
-      if (err.code === "auth/email-already-in-use") {
-        msg = "This email is already registered. Please log in.";
-      } else if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
-        msg = "Invalid email or password.";
-      }
-      setError(msg);
+      console.error("Auth error:", err);
+      const codeMap = {
+        "auth/email-already-in-use": "This email is already registered. Please sign in.",
+        "auth/invalid-credential": "Invalid email or password.",
+        "auth/user-not-found": "Invalid email or password.",
+        "auth/wrong-password": "Invalid email or password."
+      };
+      setError(codeMap[err.code] || err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  /* ── Role Selection Step ── */
+  if (step === "role") {
+    return (
+      <div className="auth-page">
+        <div className="auth-card auth-role-card">
+          {/* Brand */}
+          <div className="auth-brand-badge">
+            <span className="auth-logo-icon">A</span>
+            <span>AskMyFaculty</span>
+          </div>
+          <p className="auth-subtitle">
+            Connecting students and faculty for seamless academic support.
+          </p>
+
+          {/* Sign In / Register toggle on role screen too */}
+          <div className="auth-tab-switch">
+            <button
+              type="button"
+              className={!isRegister ? "auth-tab active" : "auth-tab"}
+              onClick={() => { setIsRegister(false); setError(""); }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={isRegister ? "auth-tab active" : "auth-tab"}
+              onClick={() => { setIsRegister(true); setError(""); }}
+            >
+              Create Account
+            </button>
+          </div>
+
+          <p className="role-prompt">
+            {isRegister ? "Register as…" : "Sign in to your portal"}
+          </p>
+
+          <div className="role-portal-cards">
+            {/* Student Card */}
+            <button
+              type="button"
+              className="portal-card student-portal"
+              onClick={() => handleRoleChoose("student")}
+            >
+              <div className="portal-card-icon">🎓</div>
+              <div className="portal-card-body">
+                <span className="portal-card-title">Student Portal</span>
+                <span className="portal-card-desc">
+                  Ask doubts, track faculty replies, book office hours
+                </span>
+              </div>
+              <span className="portal-card-arrow">→</span>
+            </button>
+
+            {/* Faculty Card */}
+            <button
+              type="button"
+              className="portal-card faculty-portal"
+              onClick={() => handleRoleChoose("faculty")}
+            >
+              <div className="portal-card-icon">👨‍🏫</div>
+              <div className="portal-card-body">
+                <span className="portal-card-title">Faculty Portal</span>
+                <span className="portal-card-desc">
+                  Review student queries, respond, and manage consultations
+                </span>
+              </div>
+              <span className="portal-card-arrow">→</span>
+            </button>
+          </div>
+
+          <p className="auth-switch" style={{ marginTop: "24px" }}>
+            {isRegister ? "Already have an account?" : "New to AskMyFaculty?"}
+            <span onClick={() => { setIsRegister(!isRegister); setError(""); }}>
+              {isRegister ? " Sign In" : " Create Account"}
+            </span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Form Step ── */
+  const isFaculty = role === "faculty";
+
   return (
     <div className="auth-page">
       <div className="auth-card">
+        {/* Brand */}
         <div className="auth-brand-badge">
-          <span className="auth-logo-icon">A</span>
+          <span className={`auth-logo-icon ${isFaculty ? "faculty-logo" : ""}`}>A</span>
           <span>AskMyFaculty</span>
         </div>
-        
-        <p className="auth-subtitle">
-          Connecting students and faculty for seamless academic support.
-        </p>
 
+        {/* Back + Role Badge */}
+        <div className="auth-role-topbar">
+          <button type="button" className="back-btn" onClick={handleBack}>
+            ← Back
+          </button>
+          <span className={`active-role-badge ${isFaculty ? "faculty-badge" : "student-badge"}`}>
+            {isFaculty ? "👨‍🏫 Faculty Portal" : "🎓 Student Portal"}
+          </span>
+        </div>
+
+        {/* Sign In / Register tab toggle */}
         <div className="auth-tab-switch">
           <button
             type="button"
             className={!isRegister ? "auth-tab active" : "auth-tab"}
-            onClick={() => {
-              setIsRegister(false);
-              setError("");
-            }}
+            onClick={() => { setIsRegister(false); setError(""); }}
           >
             Sign In
           </button>
           <button
             type="button"
             className={isRegister ? "auth-tab active" : "auth-tab"}
-            onClick={() => {
-              setIsRegister(true);
-              setError("");
-            }}
+            onClick={() => { setIsRegister(true); setError(""); }}
           >
             Create Account
           </button>
         </div>
 
-        {isRegister && (
-          <div className="role-selection-box">
-            <label className="auth-field-label">SELECT YOUR ROLE</label>
-            <div className="role-buttons">
-              <button
-                type="button"
-                className={`role-button ${role === "student" ? "active" : ""}`}
-                onClick={() => handleRoleSelect("student")}
-              >
-                <span className="role-icon">🎓</span>
-                <span className="role-title">Student</span>
-                <small className="role-desc">Ask questions & get answers</small>
-              </button>
-
-              <button
-                type="button"
-                className={`role-button ${role === "faculty" ? "active" : ""}`}
-                onClick={() => handleRoleSelect("faculty")}
-              >
-                <span className="role-icon">👨‍🏫</span>
-                <span className="role-title">Faculty</span>
-                <small className="role-desc">Review & resolve queries</small>
-              </button>
-            </div>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="auth-form">
-          {isRegister && role === "faculty" && (
+
+          {/* Faculty roster picker (register only) */}
+          {isRegister && isFaculty && (
             <div className="auth-field-group">
-              <label className="auth-field-label">FACULTY PROFILE</label>
+              <label className="auth-field-label">SELECT FROM FACULTY ROSTER</label>
               <select
                 value={selectedFacultyProfile}
                 onChange={handleFacultyProfileChange}
                 className="auth-input"
               >
-                <option value="">-- Choose from Faculty Roster --</option>
+                <option value="">-- Choose your name from roster --</option>
                 {allFaculty.map((fName) => (
-                  <option key={fName} value={fName}>
-                    {fName}
-                  </option>
+                  <option key={fName} value={fName}>{fName}</option>
                 ))}
-                <option value="custom">Other / Enter Custom Name</option>
+                <option value="custom">Other / Enter custom name</option>
               </select>
             </div>
           )}
 
+          {/* Name field (register only) */}
           {isRegister && (
             <div className="auth-field-group">
               <label className="auth-field-label">
-                {role === "faculty" ? "FACULTY NAME" : "FULL NAME"}
+                {isFaculty ? "FACULTY NAME" : "FULL NAME"}
               </label>
               <input
                 type="text"
                 className="auth-input"
-                placeholder={role === "faculty" ? "e.g. Dr. Robin Kumar" : "e.g. Ankit Sharma"}
+                placeholder={isFaculty ? "e.g. Dr. Robin Kumar" : "e.g. Ankit Sharma"}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -206,31 +250,34 @@ function Auth() {
             </div>
           )}
 
-          {isRegister && role === "faculty" && (
+          {/* Department (faculty register only) */}
+          {isRegister && isFaculty && (
             <div className="auth-field-group">
               <label className="auth-field-label">DEPARTMENT</label>
               <input
                 type="text"
                 className="auth-input"
-                placeholder="Department"
+                placeholder="e.g. Computer Science & Engineering"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
               />
             </div>
           )}
 
+          {/* Email */}
           <div className="auth-field-group">
             <label className="auth-field-label">EMAIL ADDRESS</label>
             <input
               type="email"
               className="auth-input"
-              placeholder={role === "faculty" && isRegister ? "faculty@university.edu" : "student@university.edu"}
+              placeholder={isFaculty ? "faculty@university.edu" : "student@university.edu"}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
 
+          {/* Password */}
           <div className="auth-field-group">
             <label className="auth-field-label">PASSWORD</label>
             <input
@@ -243,6 +290,7 @@ function Auth() {
             />
           </div>
 
+          {/* Confirm password (register only) */}
           {isRegister && (
             <div className="auth-field-group">
               <label className="auth-field-label">CONFIRM PASSWORD</label>
@@ -259,24 +307,23 @@ function Auth() {
 
           {error && <div className="auth-error">{error}</div>}
 
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
+          <button
+            type="submit"
+            className={`auth-submit-btn ${isFaculty ? "faculty-submit" : ""}`}
+            disabled={loading}
+          >
             {loading
               ? "Please wait..."
               : isRegister
-              ? `Register as ${role === "faculty" ? "Faculty" : "Student"}`
-              : "Sign In →"}
+              ? `Register as ${isFaculty ? "Faculty" : "Student"} →`
+              : `Sign In to ${isFaculty ? "Faculty" : "Student"} Portal →`}
           </button>
         </form>
 
         <p className="auth-switch">
-          {isRegister ? "Already registered?" : "New to AskMyFaculty?"}{" "}
-          <span
-            onClick={() => {
-              setIsRegister(!isRegister);
-              setError("");
-            }}
-          >
-            {isRegister ? "Sign In here" : "Create an Account"}
+          {isRegister ? "Already registered?" : "New to AskMyFaculty?"}
+          <span onClick={() => { setIsRegister(!isRegister); setError(""); }}>
+            {isRegister ? " Sign In" : " Create Account"}
           </span>
         </p>
       </div>
