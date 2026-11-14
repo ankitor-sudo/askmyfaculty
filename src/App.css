@@ -136,33 +136,32 @@ nav { display: grid; gap: 5px; }
 .breadcrumb span { padding: 0 8px; color: #cbd0e2; }
 .top-actions { display: flex; align-items: center; gap: 14px; }
 
-/* Sidebar Toggle Button (Enable / Disable) */
+/* Sidebar Toggle Icon Button (Enable / Disable) */
 .sidebar-toggle-btn {
   background: #f8fafc;
   border: 1.5px solid #e2e8f0;
   color: #475569;
-  padding: 6px 12px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.sidebar-toggle-btn svg {
+  display: block;
 }
 .sidebar-toggle-btn:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
   color: #1e293b;
+  transform: scale(1.04);
 }
-.sidebar-toggle-btn .toggle-icon {
-  font-size: 13px;
-  display: inline-block;
-}
-.sidebar-toggle-btn .toggle-text {
-  font-size: 11px;
-  font-weight: 700;
+.sidebar-toggle-btn:active {
+  transform: scale(0.96);
 }
 .faculty-toggle-btn:hover {
   border-color: #a7f3d0;
