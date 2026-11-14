@@ -10,10 +10,10 @@ function StudentInterface({
   userQuestions,
   loadingQuestions,
   onSubmitQuestion,
-  onLogout,
-  onSwitchRole
+  onLogout
 }) {
   const [active, setActive] = useState("Dashboard");
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [showAskModal, setShowAskModal] = useState(false);
   const [initialSubject, setInitialSubject] = useState("");
   const [initialFaculty, setInitialFaculty] = useState("");
@@ -80,7 +80,7 @@ function StudentInterface({
   ];
 
   return (
-    <div className="app student-theme">
+    <div className={`app student-theme ${!sidebarVisible ? "sidebar-hidden" : ""}`}>
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-icon">A</span>
@@ -88,6 +88,14 @@ function StudentInterface({
             <div>AskMyFaculty</div>
             <div className="portal-subtag student-tag">Student Portal</div>
           </div>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={() => setSidebarVisible(false)}
+            title="Hide Sidebar"
+          >
+            ✕
+          </button>
         </div>
 
         <p className="menu-label">WORKSPACE</p>
@@ -107,17 +115,6 @@ function StudentInterface({
             </button>
           ))}
         </nav>
-
-        <div className="role-switch-container">
-          <p className="role-switch-label">SWITCH INTERFACE</p>
-          <button
-            className="role-switch-btn"
-            onClick={() => onSwitchRole("faculty")}
-            title="Switch to Faculty View"
-          >
-            <span>👨‍🏫 Switch to Faculty View →</span>
-          </button>
-        </div>
 
         <div className="sidebar-bottom">
           <div className="help-card">
@@ -143,17 +140,26 @@ function StudentInterface({
 
       <main className="main">
         <header className="topbar">
-          <div className="breadcrumb">
-            Student Workspace <span>/</span> {active}
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarVisible(!sidebarVisible)}
+              title={sidebarVisible ? "Disable Sidebar (Hide)" : "Enable Sidebar (Show)"}
+            >
+              <span className="toggle-icon">{sidebarVisible ? "◀" : "☰"}</span>
+              <span className="toggle-text">{sidebarVisible ? "Hide Sidebar" : "Show Sidebar"}</span>
+            </button>
+
+            <div className="breadcrumb">
+              Student Workspace <span>/</span> {active}
+            </div>
           </div>
 
           <div className="top-actions">
-            <button
-              className="view-toggle-pill"
-              onClick={() => onSwitchRole("faculty")}
-            >
-              🎓 Student Mode • <span className="switch-hint">Switch to Faculty 👨‍🏫</span>
-            </button>
+            <div className="topbar-role-pill student-pill">
+              🎓 Student Portal
+            </div>
             <div className="avatar" title={studentName}>
               {initials}
             </div>

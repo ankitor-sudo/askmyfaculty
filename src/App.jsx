@@ -22,9 +22,6 @@ function App() {
   const [userProfile, setUserProfile] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Active role can be "student" or "faculty"
-  const [activeRole, setActiveRole] = useState("student");
-
   // Questions for the student
   const [studentQuestions, setStudentQuestions] = useState([]);
   const [loadingStudentQuestions, setLoadingStudentQuestions] = useState(true);
@@ -44,11 +41,6 @@ function App() {
           if (snap.exists()) {
             const data = snap.data();
             setUserProfile(data);
-            if (data.role === "faculty") {
-              setActiveRole("faculty");
-            } else {
-              setActiveRole("student");
-            }
           } else {
             // Default profile for legacy user
             const fallbackProfile = {
@@ -58,11 +50,15 @@ function App() {
               role: "student"
             };
             setUserProfile(fallbackProfile);
-            setActiveRole("student");
           }
         } catch (err) {
           console.error("Error fetching user profile:", err);
-          setActiveRole("student");
+          setUserProfile({
+            uid: currentUser.uid,
+            name: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
+            email: currentUser.email,
+            role: "student"
+          });
         }
       } else {
         setUserProfile(null);
@@ -145,6 +141,7 @@ function App() {
     try {
       setStudentQuestions([]);
       setFacultyQueries([]);
+      setUserProfile(null);
       await signOut(auth);
     } catch (error) {
       alert(error.message);
@@ -194,11 +191,6 @@ function App() {
     });
   };
 
-  // Switch between Student and Faculty View
-  const handleSwitchRole = (newRole) => {
-    setActiveRole(newRole);
-  };
-
   if (checkingAuth) {
     return <div className="auth-loading">Loading AskMyFaculty...</div>;
   }
@@ -207,7 +199,8 @@ function App() {
     return <Auth />;
   }
 
-  if (activeRole === "faculty") {
+  // Strict role enforcement: No role switching or page swapping without logging out
+  if (userProfile?.role === "faculty") {
     return (
       <FacultyInterface
         user={user}
@@ -217,7 +210,6 @@ function App() {
         onUpdateQueryAnswer={handleUpdateQueryAnswer}
         onUpdateQueryStatus={handleUpdateQueryStatus}
         onLogout={handleLogout}
-        onSwitchRole={handleSwitchRole}
       />
     );
   }
@@ -230,7 +222,6 @@ function App() {
       loadingQuestions={loadingStudentQuestions}
       onSubmitQuestion={handleSubmitQuestion}
       onLogout={handleLogout}
-      onSwitchRole={handleSwitchRole}
     />
   );
 }

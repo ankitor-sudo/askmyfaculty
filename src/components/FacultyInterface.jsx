@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import AnswerModal from "./AnswerModal";
 import AppointmentsView from "./AppointmentsView";
 import FaqView from "./FaqView";
-import { allFaculty, getSubjectsForFaculty, subjectFaculty } from "../subjectFaculty";
+import { getSubjectsForFaculty, subjectFaculty } from "../subjectFaculty";
 
 function FacultyInterface({
   user,
@@ -11,13 +11,12 @@ function FacultyInterface({
   loadingQueries,
   onUpdateQueryAnswer,
   onUpdateQueryStatus,
-  onLogout,
-  onSwitchRole
+  onLogout
 }) {
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [facultyName, setFacultyName] = useState(
-    userProfile?.facultyName || user?.displayName || allFaculty[0] || "Dr. Robin Kumar"
-  );
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const facultyName =
+    userProfile?.facultyName || user?.displayName || user?.email?.split("@")[0] || "Faculty";
   const [queryScope, setQueryScope] = useState("assigned"); // "assigned" or "all"
   const [statusFilter, setStatusFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
@@ -112,7 +111,7 @@ function FacultyInterface({
   ];
 
   return (
-    <div className="app faculty-theme">
+    <div className={`app faculty-theme ${!sidebarVisible ? "sidebar-hidden" : ""}`}>
       <aside className="sidebar faculty-sidebar">
         <div className="brand">
           <span className="brand-icon faculty-brand-icon">F</span>
@@ -120,21 +119,19 @@ function FacultyInterface({
             <div>AskMyFaculty</div>
             <div className="portal-subtag faculty-tag">Faculty Portal</div>
           </div>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={() => setSidebarVisible(false)}
+            title="Hide Sidebar"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="faculty-selector-box">
-          <label className="faculty-selector-label">LOGGED IN AS FACULTY</label>
-          <select
-            className="faculty-select-dropdown"
-            value={facultyName}
-            onChange={(e) => setFacultyName(e.target.value)}
-          >
-            {allFaculty.map((fName) => (
-              <option key={fName} value={fName}>
-                {fName}
-              </option>
-            ))}
-          </select>
+        <div className="faculty-identity-box">
+          <div className="faculty-identity-label">LOGGED IN AS</div>
+          <div className="faculty-identity-name">{facultyName}</div>
         </div>
 
         <p className="menu-label">FACULTY WORKSPACE</p>
@@ -159,17 +156,6 @@ function FacultyInterface({
           ))}
         </nav>
 
-        <div className="role-switch-container">
-          <p className="role-switch-label">SWITCH INTERFACE</p>
-          <button
-            className="role-switch-btn faculty-role-btn"
-            onClick={() => onSwitchRole("student")}
-            title="Switch to Student View"
-          >
-            <span>🎓 Switch to Student View →</span>
-          </button>
-        </div>
-
         <div className="sidebar-bottom">
           <div className="help-card faculty-tip-card">
             <strong>Faculty Tip</strong>
@@ -193,17 +179,26 @@ function FacultyInterface({
 
       <main className="main">
         <header className="topbar">
-          <div className="breadcrumb">
-            Faculty Workspace <span>/</span> {activeTab}
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="sidebar-toggle-btn faculty-toggle-btn"
+              onClick={() => setSidebarVisible(!sidebarVisible)}
+              title={sidebarVisible ? "Disable Sidebar (Hide)" : "Enable Sidebar (Show)"}
+            >
+              <span className="toggle-icon">{sidebarVisible ? "◀" : "☰"}</span>
+              <span className="toggle-text">{sidebarVisible ? "Hide Sidebar" : "Show Sidebar"}</span>
+            </button>
+
+            <div className="breadcrumb">
+              Faculty Workspace <span>/</span> {activeTab}
+            </div>
           </div>
 
           <div className="top-actions">
-            <button
-              className="view-toggle-pill faculty-pill"
-              onClick={() => onSwitchRole("student")}
-            >
-              👨‍🏫 Faculty Mode ({facultyName}) • <span className="switch-hint">Switch to Student 🎓</span>
-            </button>
+            <div className="topbar-role-pill faculty-pill">
+              👨‍🏫 Faculty Portal
+            </div>
             <div className="avatar faculty-avatar" title={facultyName}>
               {initials}
             </div>
