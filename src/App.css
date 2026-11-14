@@ -83,9 +83,13 @@ nav { display: grid; gap: 5px; }
   border: 1px solid #dcfce7;
 }
 
-/* Sidebar Bottom */
-.sidebar-bottom { margin-top: auto; }
-.help-card { background: #f7f6ff; padding: 14px; border-radius: 12px; margin: 16px 0; }
+/* Sidebar Footer Section (Positioned directly below FAQs) */
+.sidebar-bottom {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.help-card { background: #f7f6ff; padding: 14px; border-radius: 12px; margin: 0 0 14px 0; }
 .help-card strong { font-size: 12px; }
 .help-card p, .help-card button { font-size: 11px; color: #777c91; line-height: 1.5; margin: 5px 0; }
 .help-card button, .text-button { background: none; border: 0; color: #6256df; font-weight: 700; padding: 0; }
