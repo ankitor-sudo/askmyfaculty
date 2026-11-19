@@ -252,72 +252,96 @@ function FacultyInterface({
         <section className="content">
           {activeTab === "Dashboard" && (
             <>
-              <div className="welcome-row">
-                <div>
-                  <p className="eyebrow faculty-eyebrow">FACULTY DESK</p>
-                  <h1>Welcome, Prof. {facultyName} 👋</h1>
-                  <p className="muted">
-                    Manage incoming student questions, review doubts escalated from AI, and update consultation notes.
-                  </p>
+              {/* ── Professional Hero Banner (Faculty) ── */}
+              <div className="dashboard-hero-banner faculty-hero-banner">
+                <div className="hero-top-row">
+                  <span className="hero-badge-tag">👨‍🏫 Faculty Portal — Prof. {facultyName}</span>
+                  <span className="hero-status-pill">
+                    <span className="pulse-dot green" />
+                    Portal Active
+                  </span>
+                </div>
+                <h1 className="hero-title">Welcome back, Prof. {facultyName.split(" ")[0]} 👋</h1>
+                <p className="hero-subtitle">
+                  Review and resolve student academic doubts, broadcast section notices, and manage your teaching roster — all from one dashboard.
+                </p>
+                <div className="hero-actions-bar">
+                  <button className="hero-action-btn-primary" onClick={() => setShowNoticeModal(true)}>
+                    📢 Broadcast Notice
+                  </button>
+                  <button className="hero-action-btn-glass" onClick={() => setActiveTab("Incoming Queries")}>
+                    ✉ View All Queries ({pendingAssigned} pending)
+                  </button>
+                  {pendingAssigned > 0 && (
+                    <span className="hero-pill-shortcut" onClick={() => setActiveTab("Incoming Queries")}>
+                      <span className="pulse-dot amber" /> {pendingAssigned} query{pendingAssigned > 1 ? "s" : ""} need your response
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* ── KPI Stat Cards (Faculty) ── */}
+              <div className="stats faculty-stats">
+                <div className="stat-card interactive-kpi" onClick={() => setActiveTab("Incoming Queries")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon purple">✉</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
+                  <p>Assigned Queries</p>
+                  <h2>{totalAssigned}</h2>
+                  <div className="kpi-footer-hint">
+                    <small>Total from students</small>
+                    <small>View →</small>
+                  </div>
                 </div>
 
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  <button
-                    type="button"
-                    className="faculty-primary-button"
-                    onClick={() => setShowNoticeModal(true)}
-                  >
-                    📢 Broadcast Section Notice
-                  </button>
-                  <div className="status-live-badge">
-                    ● Portal Active
+                <div className="stat-card interactive-kpi" onClick={() => setActiveTab("Incoming Queries")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon orange">⏳</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
+                  <p>Pending Review</p>
+                  <h2>{pendingAssigned}</h2>
+                  <div className="kpi-footer-hint">
+                    {pendingAssigned > 0 ? <span className="pulse-dot amber" /> : <span className="pulse-dot green" />}
+                    <small>View →</small>
+                  </div>
+                </div>
+
+                <div className="stat-card interactive-kpi" onClick={() => setActiveTab("Incoming Queries")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon blue">⚡</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
+                  <p>AI-Escalated</p>
+                  <h2>{transferredCount}</h2>
+                  <div className="kpi-footer-hint">
+                    <small>Transferred from AI</small>
+                    <small>View →</small>
+                  </div>
+                </div>
+
+                <div className="stat-card interactive-kpi">
+                  <div className="kpi-header">
+                    <span className="stat-icon green">✓</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
+                  <p>Resolved by You</p>
+                  <h2>{resolvedAssigned}</h2>
+                  <div className="kpi-footer-hint">
+                    <span className="pulse-dot green" />
+                    <small>All time</small>
                   </div>
                 </div>
               </div>
 
-              <div className="stats faculty-stats">
-                <div className="stat-card">
-                  <span className="stat-icon purple">✉</span>
-                  <p>Assigned Queries</p>
-                  <h2>{totalAssigned}</h2>
-                  <small>Total student queries</small>
-                </div>
-
-                <div className="stat-card">
-                  <span className="stat-icon orange">◷</span>
-                  <p>Pending Review</p>
-                  <h2>{pendingAssigned}</h2>
-                  <small>Awaiting your resolution</small>
-                </div>
-
-                <div className="stat-card">
-                  <span className="stat-icon blue">⚡</span>
-                  <p>From AI Chatbot</p>
-                  <h2>{transferredCount}</h2>
-                  <small>Escalated by students</small>
-                </div>
-
-                <div className="stat-card">
-                  <span className="stat-icon green">✓</span>
-                  <p>Resolved by You</p>
-                  <h2>{resolvedAssigned}</h2>
-                  <small>Questions answered</small>
-                </div>
-              </div>
-
-              <div className="section-heading">
+              {/* ── Pending Queries List ── */}
+              <div className="section-heading" style={{ marginBottom: "12px" }}>
                 <div>
                   <h2>Urgent & Pending Student Queries</h2>
-                  <p className="muted">
-                    Questions awaiting your academic feedback and responses.
-                  </p>
+                  <p className="muted">Questions awaiting your academic feedback and responses.</p>
                 </div>
-
-                <button
-                  className="text-button"
-                  style={{ color: "#059669" }}
-                  onClick={() => setActiveTab("Incoming Queries")}
-                >
+                <button className="text-button" style={{ color: "#059669" }} onClick={() => setActiveTab("Incoming Queries")}>
                   View All Queries ({scopedQueries.length}) →
                 </button>
               </div>
@@ -325,11 +349,11 @@ function FacultyInterface({
               <div className="request-list">
                 {loadingQueries ? (
                   <div className="empty-box">
-                    <p>Loading questions...</p>
+                    <div className="loading-shimmer-row" /><div className="loading-shimmer-row" /><div className="loading-shimmer-row" />
                   </div>
                 ) : assignedQueries.filter((q) => q.status === "Pending" || q.transferredToFaculty).length === 0 ? (
                   <div className="empty-box success-empty">
-                    <span className="celebrate-icon">🎉</span>
+                    <div className="empty-box-icon">🎉</div>
                     <h3>All caught up, Professor!</h3>
                     <p>There are no pending queries requiring your answer right now.</p>
                   </div>
@@ -395,7 +419,9 @@ function FacultyInterface({
                         </div>
 
                         <div className="faculty-card-actions">
-                          <span className="status pending">Pending</span>
+                          <span className="status pending">
+                            <span className="pulse-dot amber" /> Pending
+                          </span>
                           <button
                             className="faculty-primary-button"
                             onClick={() => handleOpenAnswerModal(q)}
@@ -408,11 +434,12 @@ function FacultyInterface({
                 )}
               </div>
 
-              <div className="bottom-grid">
+              {/* ── Bottom Info Grid ── */}
+              <div className="bottom-grid" style={{ marginTop: "24px" }}>
                 <div className="info-card">
-                  <div className="section-heading">
+                  <div className="section-heading" style={{ marginBottom: "16px" }}>
                     <div>
-                      <h2>My Teaching Roster</h2>
+                      <h2>📚 My Teaching Roster</h2>
                       <p className="muted">Subjects under your instruction</p>
                     </div>
                   </div>
@@ -441,12 +468,19 @@ function FacultyInterface({
 
                 <div className="info-card faculty-tip-box">
                   <span className="announcement-icon">💡</span>
-                  <h2>Smart AI Doubts Assistant</h2>
+                  <h2>AI-Assisted Query Handling</h2>
                   <p>
-                    Students can quickly get automated explanations for routine doubts within minutes.
-                    When they require personal assistance or syllabus-specific guidance, their question is
-                    seamlessly transferred directly to your inbox with full context!
+                    Students get automated explanations for routine doubts within minutes via the AI Doubt Bot.
+                    When they need personal academic guidance, their question arrives in your inbox with full context.
                   </p>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
+                    <button onClick={() => setActiveTab("Section Notices")} style={{ background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0", borderRadius: "8px", padding: "8px 14px", fontSize: "12px", fontWeight: 700 }}>
+                      📢 My Broadcasts →
+                    </button>
+                    <button onClick={() => setActiveTab("Settings")} style={{ background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 14px", fontSize: "12px", fontWeight: 700 }}>
+                      ⚙ Account Settings →
+                    </button>
+                  </div>
                 </div>
               </div>
             </>

@@ -85,6 +85,26 @@ function StudentInterface({
   const [searchQuery, setSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [actionInProgressId, setActionInProgressId] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const getGreeting = () => {
+    const hr = new Date().getHours();
+    if (hr < 12) return "Good morning";
+    if (hr < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const handleCopyQuestion = (item) => {
+    const textToCopy = `[AskMyFaculty Query]\nSubject: ${item.subjectCode} (${item.subjectName})\nFaculty: Prof. ${item.facultyName}\nSection: ${item.studentSection || studentSection}\nQuestion: ${item.question}${item.answer ? `\n\nOfficial Faculty Answer (Prof. ${item.answeredBy || item.facultyName}):\n${item.answer}` : item.aiAnswer ? `\n\nAI Fast-Answer:\n${item.aiAnswer}` : ""}`;
+    navigator.clipboard?.writeText(textToCopy);
+    setCopiedId(item.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleStatCardClick = (targetStatus) => {
+    setStatusFilter(targetStatus);
+    setActive("My Questions");
+  };
 
   const unreadNoticeCount = useMemo(() => {
     let readIds = [];
@@ -352,6 +372,15 @@ function StudentInterface({
         </div>
 
         <div className="request-card-right">
+          <button
+            type="button"
+            className={`copy-card-btn ${copiedId === r.id ? "copied" : ""}`}
+            onClick={() => handleCopyQuestion(r)}
+            title="Copy question and explanation"
+          >
+            {copiedId === r.id ? "✓ Copied" : "📋 Copy"}
+          </button>
+
           <span
             className={`status ${
               isResolvedAi
@@ -363,13 +392,27 @@ function StudentInterface({
                 : r.status?.toLowerCase().replace(" ", "-") || "pending"
             }`}
           >
-            {isResolvedAi
-              ? "Resolved (AI)"
-              : isTransferred
-              ? "Transferred"
-              : isAiReviewing
-              ? "AI Answered"
-              : r.status || "Pending"}
+            {isResolvedAi ? (
+              <>
+                <span className="pulse-dot green" /> Resolved (AI)
+              </>
+            ) : isTransferred ? (
+              <>
+                <span className="pulse-dot amber" /> Transferred
+              </>
+            ) : isAiReviewing ? (
+              <>
+                <span className="pulse-dot amber" /> AI Answered
+              </>
+            ) : r.status === "Answered" ? (
+              <>
+                <span className="pulse-dot green" /> Answered
+              </>
+            ) : (
+              <>
+                <span className="pulse-dot amber" /> {r.status || "Pending"}
+              </>
+            )}
           </span>
         </div>
       </article>
@@ -520,87 +563,96 @@ function StudentInterface({
         <section className="content">
           {active === "Dashboard" && (
             <>
-              <div className="welcome-row">
-                <div>
-                  <p className="eyebrow">STUDENT DASHBOARD</p>
-                  <h1>Welcome, {studentName} 👋</h1>
-                  <p className="muted">
-                    Ask doubts to your faculty, get fast AI explanations, and transfer questions anytime.
-                  </p>
+              {/* ── Professional Hero Banner ── */}
+              <div className="dashboard-hero-banner">
+                <div className="hero-top-row">
+                  <span className="hero-badge-tag">🎓 Student Portal — Section {studentSection}</span>
+                  <span className="hero-status-pill">
+                    <span className="pulse-dot green" />
+                    Portal Active
+                  </span>
                 </div>
-
-                <div className="header-button-group">
-                  <button
-                    className="ai-chat-launcher-btn"
-                    onClick={() => setShowChatbot(true)}
-                  >
-                    🤖 Chat with AI Bot
-                  </button>
-                  <button
-                    className="primary-button"
-                    onClick={() => handleOpenAskModal()}
-                  >
+                <h1 className="hero-title">{getGreeting()}, {studentName} 👋</h1>
+                <p className="hero-subtitle">
+                  Ask doubts to your faculty, get instant AI explanations, and track every resolution — all in one place.
+                </p>
+                <div className="hero-actions-bar">
+                  <button className="hero-action-btn-primary" onClick={() => handleOpenAskModal()}>
                     ＋ Ask a Question
                   </button>
+                  <button className="hero-action-btn-glass" onClick={() => setShowChatbot(true)}>
+                    🤖 AI Doubt Bot
+                  </button>
+                  {latestSectionNotice && (
+                    <button className="hero-pill-shortcut" onClick={() => setActive("Notifications")}>
+                      📢 {latestSectionNotice.title.slice(0, 36)}{latestSectionNotice.title.length > 36 ? "…" : ""} →
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {latestSectionNotice && (
-                <div
-                  className="dashboard-section-notice-banner"
-                  onClick={() => setActive("Notifications")}
-                >
-                  <span className="banner-alert-icon">📢</span>
-                  <div className="banner-notice-info">
-                    <strong>Notice for Section {studentSection}: {latestSectionNotice.title}</strong>
-                    <p>{latestSectionNotice.content.slice(0, 140)}{latestSectionNotice.content.length > 140 ? "..." : ""}</p>
+              {/* ── KPI Stat Cards ── */}
+              <div className="stats" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+                <div className="stat-card interactive-kpi" onClick={() => handleStatCardClick("all")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon purple">✉</span>
+                    <span className="kpi-arrow-indicator">→</span>
                   </div>
-                  <span className="banner-view-link">View in Notifications →</span>
-                </div>
-              )}
-
-              <div className="stats">
-                <div className="stat-card">
-                  <span className="stat-icon purple">✉</span>
-                  <p>Total Questions</p>
+                  <p>Total Submitted</p>
                   <h2>{totalQuestions}</h2>
-                  <small>Submitted queries</small>
+                  <div className="kpi-footer-hint">
+                    <small>All queries</small>
+                    <small>View →</small>
+                  </div>
                 </div>
 
-                <div className="stat-card">
-                  <span className="stat-icon blue">🤖</span>
+                <div className="stat-card interactive-kpi" onClick={() => handleStatCardClick("AI")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon blue">🤖</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
                   <p>AI Fast-Answered</p>
                   <h2>{aiAnsweredCount}</h2>
-                  <small>In 15-min review window</small>
+                  <div className="kpi-footer-hint">
+                    <small>15-min window</small>
+                    <small>View →</small>
+                  </div>
                 </div>
 
-                <div className="stat-card">
-                  <span className="stat-icon orange">◷</span>
+                <div className="stat-card interactive-kpi" onClick={() => handleStatCardClick("Pending")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon orange">⏳</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
                   <p>Pending Faculty</p>
                   <h2>{pendingFacultyCount}</h2>
-                  <small>Awaiting teacher response</small>
+                  <div className="kpi-footer-hint">
+                    <span className="pulse-dot amber" />
+                    <small>View →</small>
+                  </div>
                 </div>
 
-                <div className="stat-card">
-                  <span className="stat-icon green">✓</span>
+                <div className="stat-card interactive-kpi" onClick={() => handleStatCardClick("Answered")}>
+                  <div className="kpi-header">
+                    <span className="stat-icon green">✓</span>
+                    <span className="kpi-arrow-indicator">→</span>
+                  </div>
                   <p>Resolved</p>
                   <h2>{resolvedCount}</h2>
-                  <small>By AI or Professor</small>
+                  <div className="kpi-footer-hint">
+                    <small>By AI or Faculty</small>
+                    <small>View →</small>
+                  </div>
                 </div>
               </div>
 
-              <div className="section-heading">
+              {/* ── Recent Questions ── */}
+              <div className="section-heading" style={{ marginBottom: "12px" }}>
                 <div>
                   <h2>Recent Questions & Doubt Resolutions</h2>
-                  <p className="muted">
-                    Track faculty responses and AI fast answers with teacher transfer options.
-                  </p>
+                  <p className="muted">Track faculty responses and AI fast answers. Click any KPI card above to filter.</p>
                 </div>
-
-                <button
-                  className="text-button"
-                  onClick={() => setActive("My Questions")}
-                >
+                <button className="text-button" onClick={() => setActive("My Questions")}>
                   View all ({totalQuestions}) →
                 </button>
               </div>
@@ -608,24 +660,16 @@ function StudentInterface({
               <div className="request-list">
                 {loadingQuestions ? (
                   <div className="empty-box">
-                    <p>Loading your questions...</p>
+                    <div className="loading-shimmer-row" /><div className="loading-shimmer-row" /><div className="loading-shimmer-row" />
                   </div>
                 ) : userQuestions.length === 0 ? (
                   <div className="empty-box">
-                    <p>You haven't submitted any questions yet.</p>
+                    <div className="empty-box-icon">📭</div>
+                    <h3>No questions yet</h3>
+                    <p>Submit your first academic doubt and get an instant AI explanation or faculty response.</p>
                     <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "14px" }}>
-                      <button
-                        className="ai-chat-launcher-btn"
-                        onClick={() => setShowChatbot(true)}
-                      >
-                        🤖 Ask AI Tutor
-                      </button>
-                      <button
-                        className="primary-button"
-                        onClick={() => handleOpenAskModal()}
-                      >
-                        Ask your first question
-                      </button>
+                      <button className="ai-chat-launcher-btn" onClick={() => setShowChatbot(true)}>🤖 Ask AI Tutor</button>
+                      <button className="primary-button" onClick={() => handleOpenAskModal()}>＋ Ask First Question</button>
                     </div>
                   </div>
                 ) : (
@@ -633,15 +677,15 @@ function StudentInterface({
                 )}
               </div>
 
-              <div className="bottom-grid">
-                <div className="info-card">
-                  <div className="section-heading">
+              {/* ── Bottom Quick-Action Grid ── */}
+              <div className="bottom-grid" style={{ marginTop: "24px" }}>
+                <div className="info-card pro-quick-actions-card">
+                  <div className="section-heading" style={{ marginBottom: "16px" }}>
                     <div>
-                      <h2>Quick Actions</h2>
-                      <p className="muted">Get academic help faster.</p>
+                      <h2>⚡ Quick Actions</h2>
+                      <p className="muted">Get academic help faster</p>
                     </div>
                   </div>
-
                   <div className="quick-actions">
                     <button onClick={() => setShowChatbot(true)}>
                       🤖
@@ -650,35 +694,42 @@ function StudentInterface({
                         <small>Instant help & answers</small>
                       </span>
                     </button>
-
                     <button onClick={() => handleOpenAskModal()}>
                       ＋
                       <span>
-                        <strong>Ask a question</strong>
-                        <small>Fast AI + Faculty transfer</small>
+                        <strong>Ask a Question</strong>
+                        <small>AI + Faculty transfer</small>
                       </span>
                     </button>
-
                     <button onClick={() => setActive("Appointments")}>
-                      ▣
+                      📅
                       <span>
                         <strong>Office Hours</strong>
-                        <small>Book consultation</small>
+                        <small>Book a slot</small>
+                      </span>
+                    </button>
+                    <button onClick={() => setActive("Settings")}>
+                      ⚙️
+                      <span>
+                        <strong>Account Settings</strong>
+                        <small>Section, password</small>
                       </span>
                     </button>
                   </div>
                 </div>
 
-                <div className="info-card announcement">
-                  <span className="announcement-icon">✦</span>
+                <div className="info-card announcement pro-directory-card">
+                  <span className="announcement-icon">📋</span>
                   <h2>Faculty Directory</h2>
                   <p>
-                    Find the right professor, check office hours and cabin locations,
-                    and submit doubts directly.
+                    Browse all professors by subject, check cabin locations and office hours, then submit your doubt directly.
                   </p>
-                  <button onClick={() => setActive("Faculty Directory")}>
-                    Browse Faculty Directory →
-                  </button>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
+                    <button onClick={() => setActive("Faculty Directory")}>Browse Faculty →</button>
+                    <button onClick={() => setActive("Notifications")} style={{ background: "transparent", border: "1px solid #c7d2fe", color: "#4f46e5", borderRadius: "8px", padding: "8px 14px", fontSize: "12px", fontWeight: 700 }}>
+                      {unreadNoticeCount > 0 ? `🔔 ${unreadNoticeCount} Unread Notice${unreadNoticeCount > 1 ? "s" : ""}` : "🔔 Notifications"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
