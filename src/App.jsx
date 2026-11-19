@@ -283,6 +283,16 @@ function App() {
     }
   };
 
+  // Update Profile Info in Firestore
+  const handleUpdateProfile = async (updates) => {
+    setUserProfile((prev) => ({ ...prev, ...updates }));
+    try {
+      await updateDoc(doc(db, "users", user.uid), updates);
+    } catch (err) {
+      console.warn("Could not save profile updates to Firestore:", err);
+    }
+  };
+
   // Faculty: Create / Broadcast Section Notice
   const handleCreateAnnouncement = async (noticeData) => {
     try {
@@ -348,6 +358,7 @@ function App() {
         onDeleteAnnouncement={handleDeleteAnnouncement}
         onUpdateQueryAnswer={handleUpdateQueryAnswer}
         onUpdateQueryStatus={handleUpdateQueryStatus}
+        onUpdateProfile={handleUpdateProfile}
         onLogout={handleLogout}
       />
     );
@@ -362,6 +373,7 @@ function App() {
       announcements={announcements}
       studentSection={userProfile?.section || "K25PS"}
       onUpdateSection={handleUpdateStudentSection}
+      onUpdateProfile={handleUpdateProfile}
       onSubmitQuestion={handleSubmitQuestion}
       onTransferQuestion={handleTransferQuestion}
       onMarkSatisfied={handleMarkSatisfied}

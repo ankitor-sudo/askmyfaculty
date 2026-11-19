@@ -4,6 +4,7 @@ import AppointmentsView from "./AppointmentsView";
 import FaqView from "./FaqView";
 import SectionNoticesModal from "./SectionNoticesModal";
 import FacultyNoticesView from "./FacultyNoticesView";
+import SettingsView from "./SettingsView";
 import { getSubjectsForFaculty, subjectFaculty } from "../subjectFaculty";
 
 function FacultyInterface({
@@ -16,6 +17,7 @@ function FacultyInterface({
   onDeleteAnnouncement,
   onUpdateQueryAnswer,
   onUpdateQueryStatus,
+  onUpdateProfile,
   onLogout
 }) {
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -124,7 +126,8 @@ function FacultyInterface({
     { name: "Section Notices", icon: "📢" },
     { name: "Office Hours", icon: "▣" },
     { name: "My Subjects", icon: "♙" },
-    { name: "Academic FAQs", icon: "?" }
+    { name: "Academic FAQs", icon: "?" },
+    { name: "Settings", icon: "⚙" }
   ];
 
   const handleNavSelect = (tabName) => {
@@ -738,6 +741,14 @@ function FacultyInterface({
           )}
 
           {activeTab === "Academic FAQs" && <FaqView />}
+
+          {activeTab === "Settings" && (
+            <SettingsView
+              user={user}
+              userProfile={userProfile}
+              onUpdateProfile={onUpdateProfile}
+            />
+          )}
         </section>
       </main>
 

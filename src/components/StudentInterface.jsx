@@ -6,6 +6,7 @@ import AppointmentsView from "./AppointmentsView";
 import FaqView from "./FaqView";
 import NotificationsView from "./NotificationsView";
 import MarkdownView from "./MarkdownView";
+import SettingsView from "./SettingsView";
 import { isSectionMatching } from "../sections";
 
 function AiReviewTimer({ deadline, createdAt }) {
@@ -56,12 +57,14 @@ function AiReviewTimer({ deadline, createdAt }) {
 }
 
 function StudentInterface({
+  user,
   userProfile,
   userQuestions,
   loadingQuestions,
   announcements = [],
   studentSection = "K25PS",
   onUpdateSection,
+  onUpdateProfile,
   onSubmitQuestion,
   onTransferQuestion,
   onMarkSatisfied,
@@ -184,7 +187,8 @@ function StudentInterface({
     { name: "AI Doubt Bot", icon: "🤖" },
     { name: "Faculty Directory", icon: "♙" },
     { name: "Appointments", icon: "▣" },
-    { name: "FAQs", icon: "?" }
+    { name: "FAQs", icon: "?" },
+    { name: "Settings", icon: "⚙" }
   ];
 
   const renderQuestionCard = (r, isCompact = false) => {
@@ -782,6 +786,16 @@ function StudentInterface({
           )}
 
           {active === "FAQs" && <FaqView />}
+
+          {active === "Settings" && (
+            <SettingsView
+              user={user}
+              userProfile={userProfile}
+              studentSection={studentSection}
+              onUpdateSection={onUpdateSection}
+              onUpdateProfile={onUpdateProfile}
+            />
+          )}
         </section>
       </main>
 
