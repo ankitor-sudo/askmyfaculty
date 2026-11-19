@@ -7,6 +7,7 @@ import {
   updateProfile
 } from "firebase/auth";
 import { allFaculty } from "./subjectFaculty";
+import { availableSections, defaultSection } from "./sections";
 import "./Auth.css";
 
 function Auth() {
@@ -21,6 +22,12 @@ function Auth() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [department, setDepartment] = useState("Computer Science & Engineering");
+
+  // Section state for students
+  const [section, setSection] = useState(defaultSection || "K25PS");
+  const [customSection, setCustomSection] = useState("");
+  const [isCustomSection, setIsCustomSection] = useState(false);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +48,9 @@ function Auth() {
     setPassword("");
     setConfirmPassword("");
     setSelectedFacultyProfile("");
+    setSection(defaultSection || "K25PS");
+    setCustomSection("");
+    setIsCustomSection(false);
   };
 
   const handleFacultyProfileChange = (e) => {
@@ -60,6 +70,10 @@ function Auth() {
       if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     }
 
+    const finalSection = isCustomSection
+      ? (customSection.trim().toUpperCase() || defaultSection || "K25PS")
+      : (section || defaultSection || "K25PS");
+
     try {
       setLoading(true);
 
@@ -71,12 +85,21 @@ function Auth() {
           name: name.trim(),
           email: email.trim(),
           role,
+          section: role === "student" ? finalSection : null,
           facultyName: role === "faculty" ? name.trim() : null,
           department: role === "faculty" ? department : null,
           createdAt: serverTimestamp()
         });
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        // Save / update student's section on login
+        if (role === "student" && finalSection) {
+          await setDoc(
+            doc(db, "users", result.user.uid),
+            { section: finalSection },
+            { merge: true }
+          );
+        }
       }
     } catch (err) {
       console.error("Auth error:", err);
@@ -247,6 +270,45 @@ function Auth() {
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </div>
+          )}
+
+          {/* Section Selection for Student (on both Register & Sign In) */}
+          {!isFaculty && (
+            <div className="auth-field-group">
+              <label className="auth-field-label">
+                STUDENT SECTION {isRegister ? "(YOUR CLASS / BATCH)" : "(CLASS / BATCH)"}
+              </label>
+              <select
+                value={isCustomSection ? "custom" : section}
+                onChange={(e) => {
+                  if (e.target.value === "custom") {
+                    setIsCustomSection(true);
+                  } else {
+                    setIsCustomSection(false);
+                    setSection(e.target.value);
+                  }
+                }}
+                className="auth-input"
+              >
+                {availableSections.map((sec) => (
+                  <option key={sec} value={sec}>
+                    Section {sec}
+                  </option>
+                ))}
+                <option value="custom">Other / Custom Section</option>
+              </select>
+
+              {isCustomSection && (
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="Enter custom section (e.g. K25CS)"
+                  value={customSection}
+                  onChange={(e) => setCustomSection(e.target.value.toUpperCase())}
+                  style={{ marginTop: "6px" }}
+                />
+              )}
             </div>
           )}
 
