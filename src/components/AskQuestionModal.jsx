@@ -1,28 +1,40 @@
 import { useState } from "react";
-import { subjectFaculty } from "../subjectFaculty";
+import { subjectFaculty, detectSubjectFromText } from "../subjectFaculty";
 
-function AskQuestionModal({
-  isOpen,
+function AskQuestionModalContent({
   onClose,
   onSubmit,
   submitting,
-  initialSubject = "",
-  initialFaculty = ""
+  initialSubject,
+  initialFaculty
 }) {
-  const [subject, setSubject] = useState(initialSubject);
-  const [faculty, setFaculty] = useState(initialFaculty);
+  const [subject, setSubject] = useState(initialSubject || "");
+  const [faculty, setFaculty] = useState(initialFaculty || "");
   const [question, setQuestion] = useState("");
-
-  if (!isOpen) return null;
+  const [enableAiFastAnswer, setEnableAiFastAnswer] = useState(true);
+  const [autoDetectedPill, setAutoDetectedPill] = useState(null);
 
   const handleSubjectChange = (e) => {
     const val = e.target.value;
     setSubject(val);
     setFaculty("");
+    setAutoDetectedPill(null);
   };
 
   const selectedSubject = subjectFaculty.find((item) => item.code === subject);
   const availableFaculty = selectedSubject ? selectedSubject.faculty : [];
+
+  const handleQuestionChange = (e) => {
+    const val = e.target.value;
+    setQuestion(val);
+
+    const detected = detectSubjectFromText(val);
+    if (detected && (!subject || detected.code !== subject)) {
+      setSubject(detected.code);
+      setFaculty(detected.primaryFaculty);
+      setAutoDetectedPill(`⚡ Auto-selected ${detected.code}: ${detected.name} (Prof. ${detected.primaryFaculty})`);
+    }
+  };
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +46,8 @@ function AskQuestionModal({
       subjectCode: subject,
       subjectName: selectedSubject?.name || subject,
       facultyName: faculty,
-      question: question.trim()
+      question: question.trim(),
+      enableAiFastAnswer
     });
     if (success) {
       setQuestion("");
@@ -58,7 +71,7 @@ function AskQuestionModal({
         <p className="eyebrow">ACADEMIC SUPPORT • STUDENT QUERY</p>
         <h2>Ask a Question</h2>
         <p className="muted">
-          Your query will be sent directly to the selected faculty member.
+          Ask your doubt to your assigned faculty member with optional fast AI resolution.
         </p>
 
         <label>Subject</label>
@@ -91,11 +104,34 @@ function AskQuestionModal({
         <label>Your Question or Academic Doubt</label>
         <textarea
           value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          onChange={handleQuestionChange}
           placeholder="Explain your doubt, mention relevant topics or code snippet..."
           required
           rows="5"
         />
+
+        {autoDetectedPill && (
+          <div className="modal-auto-detected-pill">
+            {autoDetectedPill}
+          </div>
+        )}
+
+        {/* AI Fast-Answer Option Box */}
+        <div className="ai-fast-answer-toggle-box">
+          <label className="ai-toggle-label">
+            <input
+              type="checkbox"
+              checked={enableAiFastAnswer}
+              onChange={(e) => setEnableAiFastAnswer(e.target.checked)}
+            />
+            <div className="ai-toggle-text">
+              <strong>🤖 Enable AI Fast-Answer (Recommended)</strong>
+              <span>
+                Generates a quick academic explanation. If you're not satisfied, you can transfer it to Prof. {faculty || "your teacher"} anytime!
+              </span>
+            </div>
+          </label>
+        </div>
 
         <div className="modal-actions">
           <button
@@ -111,11 +147,37 @@ function AskQuestionModal({
             className="primary-button submit-button"
             disabled={submitting}
           >
-            {submitting ? "Submitting..." : "Send Question →"}
+            {submitting
+              ? "Processing Query..."
+              : enableAiFastAnswer
+              ? "⚡ Submit with AI Fast-Answer"
+              : "Send Directly to Faculty →"}
           </button>
         </div>
       </form>
     </div>
+  );
+}
+
+function AskQuestionModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  submitting,
+  initialSubject = "",
+  initialFaculty = ""
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <AskQuestionModalContent
+      key={`${initialSubject}-${initialFaculty}`}
+      onClose={onClose}
+      onSubmit={onSubmit}
+      submitting={submitting}
+      initialSubject={initialSubject}
+      initialFaculty={initialFaculty}
+    />
   );
 }
 

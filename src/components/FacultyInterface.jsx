@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import AnswerModal from "./AnswerModal";
 import AppointmentsView from "./AppointmentsView";
 import FaqView from "./FaqView";
+import SectionNoticesModal from "./SectionNoticesModal";
+import FacultyNoticesView from "./FacultyNoticesView";
 import { getSubjectsForFaculty, subjectFaculty } from "../subjectFaculty";
 
 function FacultyInterface({
@@ -9,12 +11,20 @@ function FacultyInterface({
   userProfile,
   allQueries,
   loadingQueries,
+  announcements = [],
+  onCreateAnnouncement,
+  onDeleteAnnouncement,
   onUpdateQueryAnswer,
   onUpdateQueryStatus,
   onLogout
 }) {
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth > 768;
+    }
+    return true;
+  });
   const facultyName =
     userProfile?.facultyName || user?.displayName || user?.email?.split("@")[0] || "Faculty";
   const [queryScope, setQueryScope] = useState("assigned"); // "assigned" or "all"
@@ -23,6 +33,8 @@ function FacultyInterface({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedQueryForAnswer, setSelectedQueryForAnswer] = useState(null);
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
+  const [expandedAiAnswerId, setExpandedAiAnswerId] = useState(null);
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
 
   const taughtSubjects = useMemo(() => {
     return getSubjectsForFaculty(facultyName);
@@ -53,9 +65,10 @@ function FacultyInterface({
     return scopedQueries.filter((q) => {
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "Pending" && q.status === "Pending") ||
+        (statusFilter === "Pending" && (q.status === "Pending" || q.transferredToFaculty)) ||
         (statusFilter === "In Progress" && q.status === "In Progress") ||
-        (statusFilter === "Answered" && q.status === "Answered");
+        (statusFilter === "Answered" && q.status === "Answered") ||
+        (statusFilter === "Transferred" && q.transferredToFaculty);
 
       const matchesSubject =
         subjectFilter === "all" || q.subjectCode === subjectFilter;
@@ -72,9 +85,12 @@ function FacultyInterface({
 
   // Statistics for the faculty
   const totalAssigned = assignedQueries.length;
-  const pendingAssigned = assignedQueries.filter((q) => q.status === "Pending").length;
-  const inProgressAssigned = assignedQueries.filter((q) => q.status === "In Progress").length;
+  const pendingAssigned = assignedQueries.filter(
+    (q) => q.status === "Pending" || q.transferredToFaculty
+  ).length;
+  const _inProgressAssigned = assignedQueries.filter((q) => q.status === "In Progress").length;
   const resolvedAssigned = assignedQueries.filter((q) => q.status === "Answered").length;
+  const transferredCount = scopedQueries.filter((q) => q.transferredToFaculty).length;
 
   const handleOpenAnswerModal = (q) => {
     setSelectedQueryForAnswer(q);
@@ -105,13 +121,28 @@ function FacultyInterface({
   const menu = [
     { name: "Dashboard", icon: "▦" },
     { name: "Incoming Queries", icon: "✉" },
+    { name: "Section Notices", icon: "📢" },
     { name: "Office Hours", icon: "▣" },
     { name: "My Subjects", icon: "♙" },
     { name: "Academic FAQs", icon: "?" }
   ];
 
+  const handleNavSelect = (tabName) => {
+    setActiveTab(tabName);
+    if (typeof window !== "undefined" && window.innerWidth <= 768) {
+      setSidebarVisible(false);
+    }
+  };
+
   return (
     <div className={`app faculty-theme ${!sidebarVisible ? "sidebar-hidden" : ""}`}>
+      {sidebarVisible && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarVisible(false)}
+          aria-label="Close navigation menu"
+        />
+      )}
       <aside className="sidebar faculty-sidebar">
         <div className="brand">
           <span className="brand-icon faculty-brand-icon">F</span>
@@ -119,14 +150,24 @@ function FacultyInterface({
             <div>AskMyFaculty</div>
             <div className="portal-subtag faculty-tag">Faculty Portal</div>
           </div>
+          <button
+            type="button"
+            className="mobile-sidebar-close-btn"
+            onClick={() => setSidebarVisible(false)}
+            aria-label="Close sidebar"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="faculty-identity-box">
-          <div className="faculty-identity-label">LOGGED IN AS</div>
-          <div className="faculty-identity-name">{facultyName}</div>
+          <div className="faculty-identity-label">LOGGED IN AS FACULTY</div>
+          <div className="faculty-identity-name" title={facultyName}>
+            Prof. {facultyName}
+          </div>
         </div>
 
-        <p className="menu-label">FACULTY WORKSPACE</p>
+        <p className="menu-label">ACADEMIC WORKSPACE</p>
 
         <nav>
           {menu.map((item) => (
@@ -137,7 +178,7 @@ function FacultyInterface({
                   ? "nav-item faculty-nav-active"
                   : "nav-item"
               }
-              onClick={() => setActiveTab(item.name)}
+              onClick={() => handleNavSelect(item.name)}
             >
               <span>{item.icon}</span>
               {item.name}
@@ -150,10 +191,14 @@ function FacultyInterface({
 
         <div className="sidebar-bottom">
           <div className="help-card faculty-tip-card">
-            <strong>Faculty Tip</strong>
-            <p>
-              Answering queries within 24 hours keeps student engagement high.
-            </p>
+            <strong>Faculty Assistance</strong>
+            <p>Students can automatically resolve simple doubts with AI or escalate here.</p>
+            <button
+              className="faculty-text-btn"
+              onClick={() => setActiveTab("Academic FAQs")}
+            >
+              Portal Guidelines →
+            </button>
           </div>
 
           <div className="profile">
@@ -193,7 +238,7 @@ function FacultyInterface({
 
           <div className="top-actions">
             <div className="topbar-role-pill faculty-pill">
-              👨‍🏫 Faculty Portal
+              👨‍🏫 Faculty: {facultyName}
             </div>
             <div className="avatar faculty-avatar" title={facultyName}>
               {initials}
@@ -206,81 +251,88 @@ function FacultyInterface({
             <>
               <div className="welcome-row">
                 <div>
-                  <p className="eyebrow faculty-eyebrow">FACULTY PORTAL • OVERVIEW</p>
-                  <h1>Welcome, {facultyName} 👋</h1>
+                  <p className="eyebrow faculty-eyebrow">FACULTY DESK</p>
+                  <h1>Welcome, Prof. {facultyName} 👋</h1>
                   <p className="muted">
-                    Review and resolve student queries, coordinate office hours, and track course doubts.
+                    Manage incoming student questions, review doubts escalated from AI, and update consultation notes.
                   </p>
                 </div>
 
-                <div className="header-badge-group">
-                  <span className="status-live-badge">● Available for Queries</span>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="faculty-primary-button"
+                    onClick={() => setShowNoticeModal(true)}
+                  >
+                    📢 Broadcast Section Notice
+                  </button>
+                  <div className="status-live-badge">
+                    ● Portal Active
+                  </div>
                 </div>
               </div>
 
               <div className="stats faculty-stats">
                 <div className="stat-card">
-                  <span className="stat-icon purple">📥</span>
+                  <span className="stat-icon purple">✉</span>
                   <p>Assigned Queries</p>
                   <h2>{totalAssigned}</h2>
-                  <small>Questions specifically for you</small>
+                  <small>Total student queries</small>
                 </div>
 
                 <div className="stat-card">
-                  <span className="stat-icon orange">⏳</span>
-                  <p>Needs Response</p>
+                  <span className="stat-icon orange">◷</span>
+                  <p>Pending Review</p>
                   <h2>{pendingAssigned}</h2>
-                  <small>Pending student questions</small>
+                  <small>Awaiting your resolution</small>
                 </div>
 
                 <div className="stat-card">
-                  <span className="stat-icon blue">◷</span>
-                  <p>In Progress</p>
-                  <h2>{inProgressAssigned}</h2>
-                  <small>Under ongoing review</small>
+                  <span className="stat-icon blue">⚡</span>
+                  <p>From AI Chatbot</p>
+                  <h2>{transferredCount}</h2>
+                  <small>Escalated by students</small>
                 </div>
 
                 <div className="stat-card">
                   <span className="stat-icon green">✓</span>
-                  <p>Resolved</p>
+                  <p>Resolved by You</p>
                   <h2>{resolvedAssigned}</h2>
-                  <small>Successfully answered</small>
+                  <small>Questions answered</small>
                 </div>
               </div>
 
               <div className="section-heading">
                 <div>
-                  <h2>Urgent Queries Requiring Your Response</h2>
+                  <h2>Urgent & Pending Student Queries</h2>
                   <p className="muted">
-                    Showing latest pending questions submitted to you.
+                    Questions awaiting your academic feedback and responses.
                   </p>
                 </div>
 
                 <button
                   className="text-button"
-                  onClick={() => {
-                    setActiveTab("Incoming Queries");
-                    setStatusFilter("Pending");
-                  }}
+                  style={{ color: "#059669" }}
+                  onClick={() => setActiveTab("Incoming Queries")}
                 >
-                  View All Queries ({totalAssigned}) →
+                  View All Queries ({scopedQueries.length}) →
                 </button>
               </div>
 
               <div className="request-list">
                 {loadingQueries ? (
                   <div className="empty-box">
-                    <p>Loading queries...</p>
+                    <p>Loading questions...</p>
                   </div>
-                ) : assignedQueries.filter((q) => q.status === "Pending").length === 0 ? (
+                ) : assignedQueries.filter((q) => q.status === "Pending" || q.transferredToFaculty).length === 0 ? (
                   <div className="empty-box success-empty">
                     <span className="celebrate-icon">🎉</span>
-                    <h3>All caught up!</h3>
-                    <p>No pending queries are waiting for your response right now.</p>
+                    <h3>All caught up, Professor!</h3>
+                    <p>There are no pending queries requiring your answer right now.</p>
                   </div>
                 ) : (
                   assignedQueries
-                    .filter((q) => q.status === "Pending")
+                    .filter((q) => q.status === "Pending" || q.transferredToFaculty)
                     .slice(0, 5)
                     .map((q) => (
                       <article className="request-card faculty-card-item" key={q.id}>
@@ -295,6 +347,11 @@ function FacultyInterface({
                             <span className="subject-tag">
                               {q.subjectCode}: {q.subjectName}
                             </span>
+                            {q.transferredToFaculty && (
+                              <span className="escalated-ai-badge">
+                                ⚡ Transferred from AI Doubt Bot
+                              </span>
+                            )}
                           </div>
 
                           <h3 className="query-title">{q.question}</h3>
@@ -305,6 +362,33 @@ function FacultyInterface({
                               ? q.createdAt.toDate().toLocaleString()
                               : "Just now"}
                           </p>
+
+                          {q.aiAnswer && (
+                            <div className="card-ai-preview-toggle">
+                              <button
+                                type="button"
+                                className="toggle-ai-answer-btn"
+                                onClick={() =>
+                                  setExpandedAiAnswerId(
+                                    expandedAiAnswerId === q.id ? null : q.id
+                                  )
+                                }
+                              >
+                                {expandedAiAnswerId === q.id
+                                  ? "Hide initial AI response ▲"
+                                  : "View initial AI response student reviewed ▼"}
+                              </button>
+                              {expandedAiAnswerId === q.id && (
+                                <div className="card-ai-answer-box">
+                                  <strong>Initial AI answer:</strong>
+                                  <p>{q.aiAnswer}</p>
+                                  {q.transferReason && (
+                                    <small>Reason: {q.transferReason}</small>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="faculty-card-actions">
@@ -354,17 +438,12 @@ function FacultyInterface({
 
                 <div className="info-card faculty-tip-box">
                   <span className="announcement-icon">💡</span>
-                  <h2>Office Hours Guidelines</h2>
+                  <h2>Smart AI Doubts Assistant</h2>
                   <p>
-                    Regular office consultations allow addressing complex design or
-                    algorithmic questions that cannot be resolved in a single text reply.
+                    Students can quickly get automated explanations for routine doubts within minutes.
+                    When they require personal assistance or syllabus-specific guidance, their question is
+                    seamlessly transferred directly to your inbox with full context!
                   </p>
-                  <button
-                    className="faculty-text-btn"
-                    onClick={() => setActiveTab("Office Hours")}
-                  >
-                    View Appointment Schedule →
-                  </button>
                 </div>
               </div>
             </>
@@ -374,8 +453,8 @@ function FacultyInterface({
             <div className="faculty-queries-view">
               <div className="welcome-row">
                 <div>
-                  <p className="eyebrow faculty-eyebrow">STUDENT INQUIRIES</p>
-                  <h1>Incoming Academic Queries</h1>
+                  <p className="eyebrow faculty-eyebrow">QUERIES INBOX</p>
+                  <h1>Student Academic Doubts</h1>
                   <p className="muted">
                     Review, resolve, and answer student questions across your courses.
                   </p>
@@ -409,7 +488,13 @@ function FacultyInterface({
                     className={`pill-btn ${statusFilter === "Pending" ? "active" : ""}`}
                     onClick={() => setStatusFilter("Pending")}
                   >
-                    Pending ({scopedQueries.filter((q) => q.status === "Pending").length})
+                    Pending ({scopedQueries.filter((q) => q.status === "Pending" || q.transferredToFaculty).length})
+                  </button>
+                  <button
+                    className={`pill-btn ${statusFilter === "Transferred" ? "active" : ""}`}
+                    onClick={() => setStatusFilter("Transferred")}
+                  >
+                    ⚡ Transferred from AI ({transferredCount})
                   </button>
                   <button
                     className={`pill-btn ${statusFilter === "In Progress" ? "active" : ""}`}
@@ -478,6 +563,11 @@ function FacultyInterface({
                               <span>Target Faculty: <strong>{q.facultyName}</strong></span>
                             </>
                           )}
+                          {q.transferredToFaculty && (
+                            <span className="escalated-ai-badge">
+                              ⚡ Transferred from AI Doubt Bot
+                            </span>
+                          )}
                         </div>
 
                         <h3 className="query-title">{q.question}</h3>
@@ -488,6 +578,34 @@ function FacultyInterface({
                             ? q.createdAt.toDate().toLocaleString()
                             : "Recently"}
                         </p>
+
+                        {/* Expandable Initial AI Answer */}
+                        {q.aiAnswer && (
+                          <div className="card-ai-preview-toggle">
+                            <button
+                              type="button"
+                              className="toggle-ai-answer-btn"
+                              onClick={() =>
+                                setExpandedAiAnswerId(
+                                  expandedAiAnswerId === q.id ? null : q.id
+                                )
+                              }
+                            >
+                              {expandedAiAnswerId === q.id
+                                ? "Hide initial AI response ▲"
+                                : "View initial AI response student reviewed ▼"}
+                            </button>
+                            {expandedAiAnswerId === q.id && (
+                              <div className="card-ai-answer-box">
+                                <strong>Initial AI response:</strong>
+                                <p>{q.aiAnswer}</p>
+                                {q.transferReason && (
+                                  <small>Transfer reason: {q.transferReason}</small>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {q.answer ? (
                           <div className="faculty-answer-box faculty-view-answer">
@@ -536,6 +654,15 @@ function FacultyInterface({
             </div>
           )}
 
+          {activeTab === "Section Notices" && (
+            <FacultyNoticesView
+              announcements={announcements}
+              facultyName={facultyName}
+              onOpenCreateModal={() => setShowNoticeModal(true)}
+              onDeleteNotice={onDeleteAnnouncement}
+            />
+          )}
+
           {activeTab === "Office Hours" && (
             <AppointmentsView
               role="faculty"
@@ -558,8 +685,8 @@ function FacultyInterface({
               <div className="faculty-grid">
                 {taughtSubjects.map((sub) => {
                   const subQueries = allQueries.filter((q) => q.subjectCode === sub.code);
-                  const pendingSubQueries = subQueries.filter((q) => q.status === "Pending");
-                  const answeredSubQueries = subQueries.filter((q) => q.status === "Answered");
+                  const subPending = subQueries.filter((q) => q.status === "Pending" || q.transferredToFaculty).length;
+                  const subResolved = subQueries.filter((q) => q.status === "Answered").length;
 
                   return (
                     <div className="faculty-card subject-card" key={sub.code}>
@@ -567,34 +694,35 @@ function FacultyInterface({
                         <div className="roster-big-icon">📚</div>
                         <div>
                           <h3 className="faculty-name">{sub.name}</h3>
-                          <p className="faculty-dept">Course Code: {sub.code}</p>
+                          <p className="faculty-dept">Course Code: <strong>{sub.code}</strong></p>
+                        </div>
+                      </div>
+
+                      <div className="faculty-details">
+                        <div className="detail-item">
+                          <span className="detail-label">Instructors:</span>
+                          <span className="detail-value">{sub.faculty.join(", ")}</span>
                         </div>
                       </div>
 
                       <div className="subject-stat-pills">
                         <div className="sub-stat">
                           <strong>{subQueries.length}</strong>
-                          <small>Total Queries</small>
+                          <small>Total Doubts</small>
                         </div>
                         <div className="sub-stat">
-                          <strong style={{ color: "#d97706" }}>{pendingSubQueries.length}</strong>
+                          <strong style={{ color: "#d97706" }}>{subPending}</strong>
                           <small>Pending</small>
                         </div>
                         <div className="sub-stat">
-                          <strong style={{ color: "#059669" }}>{answeredSubQueries.length}</strong>
+                          <strong style={{ color: "#059669" }}>{subResolved}</strong>
                           <small>Resolved</small>
-                        </div>
-                      </div>
-
-                      <div className="faculty-details">
-                        <div className="detail-item">
-                          <span className="detail-label">Co-Instructors:</span>
-                          <span className="detail-value">{sub.faculty.join(", ")}</span>
                         </div>
                       </div>
 
                       <button
                         className="ask-faculty-btn"
+                        style={{ color: "#047857", borderColor: "#a7f3d0", background: "#ecfdf5" }}
                         onClick={() => {
                           setActiveTab("Incoming Queries");
                           setSubjectFilter(sub.code);
@@ -614,11 +742,19 @@ function FacultyInterface({
       </main>
 
       <AnswerModal
-        isOpen={!!selectedQueryForAnswer}
+        isOpen={Boolean(selectedQueryForAnswer)}
         onClose={() => setSelectedQueryForAnswer(null)}
         queryItem={selectedQueryForAnswer}
         onSubmitAnswer={handleSubmitAnswer}
         submitting={submittingAnswer}
+      />
+
+      <SectionNoticesModal
+        isOpen={showNoticeModal}
+        onClose={() => setShowNoticeModal(false)}
+        onSubmitNotice={onCreateAnnouncement}
+        facultyName={facultyName}
+        taughtSubjects={taughtSubjects}
       />
     </div>
   );

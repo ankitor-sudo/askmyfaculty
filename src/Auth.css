@@ -336,3 +336,63 @@
 .auth-switch span:hover {
   text-decoration: underline;
 }
+
+/* ── Mobile Phone Optimization (max-width: 480px) ── */
+@media (max-width: 480px) {
+  .auth-page {
+    padding: 12px;
+    align-items: center;
+  }
+  .auth-card {
+    padding: 24px 18px;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(23, 23, 45, 0.08);
+  }
+  .auth-brand-badge {
+    font-size: 20px;
+  }
+  .auth-logo-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  .auth-subtitle {
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  .auth-tab-switch {
+    margin-bottom: 18px;
+  }
+  .auth-tab {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .portal-card {
+    padding: 14px 12px;
+    gap: 12px;
+    border-radius: 14px;
+  }
+  .portal-card-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+    border-radius: 10px;
+  }
+  .portal-card-title {
+    font-size: 14px;
+  }
+  .portal-card-desc {
+    font-size: 11px;
+  }
+  .auth-input {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+    padding: 11px 12px;
+  }
+  .auth-submit-btn {
+    padding: 12px;
+    font-size: 14px;
+  }
+  .auth-role-topbar {
+    margin-bottom: 14px;
+  }
+}

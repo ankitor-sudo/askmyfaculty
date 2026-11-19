@@ -10,6 +10,7 @@ function AnswerModalContent({
   const [status, setStatus] = useState(
     queryItem.status === "Pending" ? "Answered" : queryItem.status
   );
+  const [showAiAnswer, setShowAiAnswer] = useState(false);
 
   const quickTemplates = [
     "Please review chapter 4 of the course materials and let me know if you still have doubts.",
@@ -61,6 +62,30 @@ function AnswerModalContent({
               : "Recently"}
           </small>
         </div>
+
+        {/* Transferred AI Answer Context */}
+        {queryItem.aiAnswer && (
+          <div className="faculty-ai-context-box">
+            <div className="ai-context-header">
+              <span className="ai-tag-badge">🤖 Initial AI Answer Provided</span>
+              <button
+                type="button"
+                className="ai-toggle-btn"
+                onClick={() => setShowAiAnswer(!showAiAnswer)}
+              >
+                {showAiAnswer ? "Hide AI text ▲" : "View what AI replied ▼"}
+              </button>
+            </div>
+            {showAiAnswer && (
+              <div className="ai-context-body">
+                {queryItem.aiAnswer}
+              </div>
+            )}
+            <div className="transfer-reason-note">
+              ⚡ Student escalated this query: <em>{queryItem.transferReason || "Needs professor clarification"}</em>
+            </div>
+          </div>
+        )}
 
         <div className="template-chips">
           <label className="field-label-small">QUICK TEMPLATES</label>
