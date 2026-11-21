@@ -5,7 +5,6 @@ import {
   addDoc,
   collection,
   doc,
-  getDoc,
   onSnapshot,
   query,
   where,
@@ -36,45 +35,62 @@ function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [_loadingAnnouncements, setLoadingAnnouncements] = useState(true);
 
-  // 1. Auth Listener & Profile Fetch
+  // 1. Auth Listener + Live Profile Listener (onSnapshot instead of getDoc)
+  //    onSnapshot waits for the Firestore doc to appear — fixes the race
+  //    condition where onAuthStateChanged fires before setDoc finishes writing.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let profileUnsub = null; // inner profile listener cleanup
+
+    const authUnsub = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+
+      // Clean up any previous profile listener before switching users
+      if (profileUnsub) {
+        profileUnsub();
+        profileUnsub = null;
+      }
+
       if (currentUser) {
-        try {
-          const userDocRef = doc(db, "users", currentUser.uid);
-          const snap = await getDoc(userDocRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            setUserProfile(data);
-          } else {
-            // Default profile for legacy user
-            const fallbackProfile = {
+        const userDocRef = doc(db, "users", currentUser.uid);
+
+        // onSnapshot fires every time the doc changes — including when
+        // Auth.jsx's setDoc() finishes writing right after registration.
+        profileUnsub = onSnapshot(
+          userDocRef,
+          (snap) => {
+            if (snap.exists()) {
+              setUserProfile(snap.data());
+            } else {
+              // Doc not written yet (brief gap after registration) — keep
+              // showing the loader; the next snapshot will have the real data.
+              // Only fall back after the user has had time to write.
+              setUserProfile(null);
+            }
+            setCheckingAuth(false);
+          },
+          (err) => {
+            console.error("Error watching user profile:", err);
+            // On error, fall back to auth display name only — no role assumption
+            setUserProfile({
               uid: currentUser.uid,
               name: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
               email: currentUser.email,
-              role: "student",
-              section: "K25PS"
-            };
-            setUserProfile(fallbackProfile);
+              role: null,
+              section: "K25PS",
+            });
+            setCheckingAuth(false);
           }
-        } catch (err) {
-          console.error("Error fetching user profile:", err);
-          setUserProfile({
-            uid: currentUser.uid,
-            name: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
-            email: currentUser.email,
-            role: "student",
-            section: "K25PS"
-          });
-        }
+        );
       } else {
         setUserProfile(null);
+        setCheckingAuth(false);
       }
-      setCheckingAuth(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      authUnsub();
+      if (profileUnsub) profileUnsub();
+    };
   }, []);
 
   // 2. Student Questions Listener
@@ -346,8 +362,9 @@ function App() {
   }
 
   // Show loader while profile is still being fetched from Firestore
-  if (!userProfile) {
-    return <div className="auth-loading">Loading your profile...</div>;
+  // Also wait if role is null (brief gap during registration before setDoc completes)
+  if (!userProfile || !userProfile.role) {
+    return <div className="auth-loading">Setting up your profile...</div>;
   }
 
   // Strict role enforcement
