@@ -1003,3 +1003,133 @@
   font-weight: 600;
   letter-spacing: -0.2px;
 }
+
+/* ── Loading Screen & Recovery ── */
+.auth-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d0f1a;
+  padding: 24px;
+  font-family: inherit;
+  color: #fff;
+}
+
+.auth-loading-card {
+  max-width: 440px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 36px 30px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+}
+
+.auth-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 3.5px solid rgba(101, 88, 232, 0.2);
+  border-top-color: #6558e8;
+  border-radius: 50%;
+  animation: authSpin 0.9s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-loading-card h2 {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.auth-loading-card p {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 20px;
+}
+
+.auth-recovery-box {
+  width: 100%;
+  background: rgba(101, 88, 232, 0.08);
+  border: 1px solid rgba(101, 88, 232, 0.25);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.auth-recovery-notice {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  margin: 0 0 12px !important;
+  line-height: 1.5;
+}
+
+.auth-recovery-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-recovery-btn {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-recovery-btn.student {
+  background: rgba(101, 88, 232, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(101, 88, 232, 0.4);
+}
+
+.auth-recovery-btn.student:hover {
+  background: rgba(101, 88, 232, 0.35);
+  color: #fff;
+}
+
+.auth-recovery-btn.faculty {
+  background: rgba(5, 150, 105, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(5, 150, 105, 0.4);
+}
+
+.auth-recovery-btn.faculty:hover {
+  background: rgba(5, 150, 105, 0.35);
+  color: #fff;
+}
+
+.auth-loading-signout {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.auth-loading-signout:hover {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}

@@ -181,6 +181,13 @@ function Auth() {
 
     try {
       setLoading(true);
+      // Remember selected role so App.jsx can self-heal if profile doc is delayed
+      try {
+        sessionStorage.setItem("last_auth_role", role);
+      } catch (err) {
+        console.warn("Could not cache auth role:", err);
+      }
+
       if (isRegister) {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(result.user, { displayName: name.trim() });
@@ -213,6 +220,18 @@ function Auth() {
             setLoading(false);
             return;
           }
+        } else {
+          // Profile doc missing (legacy user) — create it right now with the chosen role!
+          await setDoc(doc(db, "users", result.user.uid), {
+            uid: result.user.uid,
+            name: result.user.displayName || email.split("@")[0] || "User",
+            email: email.trim(),
+            role,
+            section: role === "student" ? finalSection : null,
+            facultyName: role === "faculty" ? (result.user.displayName || email.split("@")[0]) : null,
+            department: role === "faculty" ? "Computer Science & Engineering" : null,
+            createdAt: serverTimestamp(),
+          });
         }
 
         // Only update section for students on sign-in

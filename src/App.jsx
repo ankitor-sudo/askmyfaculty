@@ -5,6 +5,7 @@ import {
   addDoc,
   collection,
   doc,
+  setDoc,
   onSnapshot,
   query,
   where,
@@ -22,6 +23,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [profileLoadingTimeout, setProfileLoadingTimeout] = useState(false);
 
   // Questions for the student
   const [studentQuestions, setStudentQuestions] = useState([]);
@@ -35,16 +37,26 @@ function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [_loadingAnnouncements, setLoadingAnnouncements] = useState(true);
 
-  // 1. Auth Listener + Live Profile Listener (onSnapshot instead of getDoc)
-  //    onSnapshot waits for the Firestore doc to appear — fixes the race
-  //    condition where onAuthStateChanged fires before setDoc finishes writing.
+  // Profile timeout timer: if profile takes >2.5s, offer manual recovery
   useEffect(() => {
-    let profileUnsub = null; // inner profile listener cleanup
+    if (user && (!userProfile || !userProfile.role)) {
+      const timer = setTimeout(() => {
+        setProfileLoadingTimeout(true);
+      }, 2500);
+      return () => {
+        clearTimeout(timer);
+        setProfileLoadingTimeout(false);
+      };
+    }
+  }, [user, userProfile]);
+
+  // 1. Auth Listener + Live Profile Listener (onSnapshot with auto-healing)
+  useEffect(() => {
+    let profileUnsub = null;
 
     const authUnsub = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
 
-      // Clean up any previous profile listener before switching users
       if (profileUnsub) {
         profileUnsub();
         profileUnsub = null;
@@ -53,29 +65,42 @@ function App() {
       if (currentUser) {
         const userDocRef = doc(db, "users", currentUser.uid);
 
-        // onSnapshot fires every time the doc changes — including when
-        // Auth.jsx's setDoc() finishes writing right after registration.
         profileUnsub = onSnapshot(
           userDocRef,
           (snap) => {
             if (snap.exists()) {
               setUserProfile(snap.data());
             } else {
-              // Doc not written yet (brief gap after registration) — keep
-              // showing the loader; the next snapshot will have the real data.
-              // Only fall back after the user has had time to write.
-              setUserProfile(null);
+              // Doc not found yet. Check if we have a cached role from login/register
+              const cachedRole = sessionStorage.getItem("last_auth_role");
+              if (cachedRole) {
+                const autoDoc = {
+                  uid: currentUser.uid,
+                  name: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
+                  email: currentUser.email,
+                  role: cachedRole,
+                  section: cachedRole === "student" ? "K25PS" : null,
+                  facultyName: cachedRole === "faculty" ? (currentUser.displayName || currentUser.email?.split("@")[0] || "Faculty") : null,
+                  department: cachedRole === "faculty" ? "Computer Science & Engineering" : null,
+                  createdAt: serverTimestamp(),
+                };
+                setDoc(userDocRef, autoDoc, { merge: true }).catch(console.error);
+                setUserProfile(autoDoc);
+                sessionStorage.removeItem("last_auth_role");
+              } else {
+                setUserProfile(null);
+              }
             }
             setCheckingAuth(false);
           },
           (err) => {
             console.error("Error watching user profile:", err);
-            // On error, fall back to auth display name only — no role assumption
+            const cachedRole = sessionStorage.getItem("last_auth_role") || "student";
             setUserProfile({
               uid: currentUser.uid,
               name: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
               email: currentUser.email,
-              role: null,
+              role: cachedRole,
               section: "K25PS",
             });
             setCheckingAuth(false);
@@ -353,6 +378,28 @@ function App() {
     });
   };
 
+  // Self-provision or repair profile if document is missing or corrupted
+  const handleSelfProvisionProfile = async (chosenRole) => {
+    if (!user) return;
+    const defaultData = {
+      uid: user.uid,
+      name: user.displayName || user.email?.split("@")[0] || "User",
+      email: user.email,
+      role: chosenRole,
+      section: chosenRole === "student" ? "K25PS" : null,
+      facultyName: chosenRole === "faculty" ? (user.displayName || user.email?.split("@")[0] || "Faculty") : null,
+      department: chosenRole === "faculty" ? "Computer Science & Engineering" : null,
+      createdAt: serverTimestamp(),
+    };
+    try {
+      await setDoc(doc(db, "users", user.uid), defaultData, { merge: true });
+      setUserProfile(defaultData);
+    } catch (e) {
+      console.error("Could not self-provision profile:", e);
+      setUserProfile(defaultData);
+    }
+  };
+
   if (checkingAuth) {
     return <div className="auth-loading">Loading AskMyFaculty...</div>;
   }
@@ -361,10 +408,49 @@ function App() {
     return <Auth />;
   }
 
-  // Show loader while profile is still being fetched from Firestore
-  // Also wait if role is null (brief gap during registration before setDoc completes)
+  // Show loader with recovery option if Firestore document is delayed or missing
   if (!userProfile || !userProfile.role) {
-    return <div className="auth-loading">Setting up your profile...</div>;
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-card">
+          <div className="auth-loading-spinner" />
+          <h2>Setting up your profile...</h2>
+          <p>Connecting to your academic dashboard...</p>
+
+          {profileLoadingTimeout && (
+            <div className="auth-recovery-box">
+              <p className="auth-recovery-notice">
+                Profile document was not found for this account. Choose your portal to finish setting up:
+              </p>
+              <div className="auth-recovery-buttons">
+                <button
+                  type="button"
+                  className="auth-recovery-btn student"
+                  onClick={() => handleSelfProvisionProfile("student")}
+                >
+                  🎓 Enter as Student
+                </button>
+                <button
+                  type="button"
+                  className="auth-recovery-btn faculty"
+                  onClick={() => handleSelfProvisionProfile("faculty")}
+                >
+                  👨‍🏫 Enter as Faculty
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="auth-loading-signout"
+            onClick={handleLogout}
+          >
+            ← Sign Out / Return to Login
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Strict role enforcement
