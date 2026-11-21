@@ -345,6 +345,11 @@ function App() {
     return <Auth />;
   }
 
+  // Show loader while profile is still being fetched from Firestore
+  if (!userProfile) {
+    return <div className="auth-loading">Loading your profile...</div>;
+  }
+
   // Strict role enforcement
   if (userProfile?.role === "faculty") {
     return (

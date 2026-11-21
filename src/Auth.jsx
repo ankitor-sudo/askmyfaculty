@@ -1,9 +1,10 @@
 import { auth, db } from "./firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signOut,
   updateProfile
 } from "firebase/auth";
 import { allFaculty } from "./subjectFaculty";
@@ -194,7 +195,27 @@ function Auth() {
           createdAt: serverTimestamp(),
         });
       } else {
+        // Sign-in: verify the account's role matches the selected portal
         const result = await signInWithEmailAndPassword(auth, email, password);
+
+        // Read the Firestore profile to check role
+        const profileSnap = await getDoc(doc(db, "users", result.user.uid));
+        if (profileSnap.exists()) {
+          const profileData = profileSnap.data();
+          // Mismatch: user chose wrong portal
+          if (profileData.role && profileData.role !== role) {
+            await signOut(auth);
+            setError(
+              profileData.role === "faculty"
+                ? "⚠️ This is a Faculty account. Please choose the Faculty Portal."
+                : "⚠️ This is a Student account. Please choose the Student Portal."
+            );
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Only update section for students on sign-in
         if (role === "student" && finalSection) {
           await setDoc(
             doc(db, "users", result.user.uid),
