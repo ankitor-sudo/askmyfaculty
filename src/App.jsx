@@ -14,8 +14,11 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import Auth from "./Auth";
+import { INITIAL_ADMIN_EMAILS } from "./adminConfig";
 import StudentInterface from "./components/StudentInterface";
 import FacultyInterface from "./components/FacultyInterface";
+import FacultyApplicationStatus from "./components/FacultyApplicationStatus";
+import AdminDashboard from "./components/AdminDashboard";
 import { generateAiAnswer } from "./services/aiService";
 import "./App.css";
 
@@ -69,16 +72,40 @@ function App() {
           userDocRef,
           (snap) => {
             if (snap.exists()) {
-              setUserProfile(snap.data());
+              const data = snap.data();
+              // Check if authorized initial admin
+              const emailLower = currentUser.email?.toLowerCase();
+              if (INITIAL_ADMIN_EMAILS.includes(emailLower) && data.role !== "admin") {
+                const adminDoc = { ...data, role: "admin" };
+                setDoc(userDocRef, { role: "admin" }, { merge: true }).catch(console.error);
+                setUserProfile(adminDoc);
+              } else {
+                setUserProfile(data);
+              }
             } else {
-              // Doc not found yet. Check if we have a cached role from login/register
+              // Doc not found yet. Check if initial admin or cached role
+              const emailLower = currentUser.email?.toLowerCase();
+              const isInitialAdmin = INITIAL_ADMIN_EMAILS.includes(emailLower);
               const cachedRole = sessionStorage.getItem("last_auth_role");
-              if (cachedRole) {
+
+              if (isInitialAdmin) {
+                const adminDoc = {
+                  uid: currentUser.uid,
+                  name: currentUser.displayName || currentUser.email?.split("@")[0] || "Admin",
+                  email: currentUser.email,
+                  role: "admin",
+                  createdAt: serverTimestamp(),
+                };
+                setDoc(userDocRef, adminDoc, { merge: true }).catch(console.error);
+                setUserProfile(adminDoc);
+                sessionStorage.removeItem("last_auth_role");
+              } else if (cachedRole) {
                 const autoDoc = {
                   uid: currentUser.uid,
                   name: currentUser.displayName || currentUser.email?.split("@")[0] || "User",
                   email: currentUser.email,
                   role: cachedRole,
+                  approvalStatus: cachedRole === "faculty" ? "pending" : null,
                   section: cachedRole === "student" ? "K25PS" : null,
                   facultyName: cachedRole === "faculty" ? (currentUser.displayName || currentUser.email?.split("@")[0] || "Faculty") : null,
                   department: cachedRole === "faculty" ? "Computer Science & Engineering" : null,
@@ -386,6 +413,7 @@ function App() {
       name: user.displayName || user.email?.split("@")[0] || "User",
       email: user.email,
       role: chosenRole,
+      approvalStatus: chosenRole === "faculty" ? "pending" : null,
       section: chosenRole === "student" ? "K25PS" : null,
       facultyName: chosenRole === "faculty" ? (user.displayName || user.email?.split("@")[0] || "Faculty") : null,
       department: chosenRole === "faculty" ? "Computer Science & Engineering" : null,
@@ -435,7 +463,7 @@ function App() {
                   className="auth-recovery-btn faculty"
                   onClick={() => handleSelfProvisionProfile("faculty")}
                 >
-                  👨‍🏫 Enter as Faculty
+                  👨‍🏫 Register Faculty Application
                 </button>
               </div>
             </div>
@@ -453,25 +481,49 @@ function App() {
     );
   }
 
-  // Strict role enforcement
-  if (userProfile?.role === "faculty") {
+  // 1. Strict Administrator Role
+  if (userProfile?.role === "admin") {
     return (
-      <FacultyInterface
+      <AdminDashboard
         user={user}
         userProfile={userProfile}
-        allQueries={facultyQueries}
-        loadingQueries={loadingFacultyQueries}
-        announcements={announcements}
-        onCreateAnnouncement={handleCreateAnnouncement}
-        onDeleteAnnouncement={handleDeleteAnnouncement}
-        onUpdateQueryAnswer={handleUpdateQueryAnswer}
-        onUpdateQueryStatus={handleUpdateQueryStatus}
-        onUpdateProfile={handleUpdateProfile}
         onLogout={handleLogout}
       />
     );
   }
 
+  // 2. Strict Faculty Role & Approval Enforcement
+  if (userProfile?.role === "faculty") {
+    if (userProfile?.approvalStatus === "approved") {
+      return (
+        <FacultyInterface
+          user={user}
+          userProfile={userProfile}
+          allQueries={facultyQueries}
+          loadingQueries={loadingFacultyQueries}
+          announcements={announcements}
+          onCreateAnnouncement={handleCreateAnnouncement}
+          onDeleteAnnouncement={handleDeleteAnnouncement}
+          onUpdateQueryAnswer={handleUpdateQueryAnswer}
+          onUpdateQueryStatus={handleUpdateQueryStatus}
+          onUpdateProfile={handleUpdateProfile}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
+    // Pending, Rejected, or Suspended -> Application Status Page
+    return (
+      <FacultyApplicationStatus
+        user={user}
+        userProfile={userProfile}
+        onLogout={handleLogout}
+        onProfileUpdated={(updated) => setUserProfile(updated)}
+      />
+    );
+  }
+
+  // 3. Student Role
   return (
     <StudentInterface
       user={user}

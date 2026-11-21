@@ -7,8 +7,8 @@ import {
   signOut,
   updateProfile
 } from "firebase/auth";
-import { allFaculty } from "./subjectFaculty";
 import { availableSections, defaultSection } from "./sections";
+import { INITIAL_ADMIN_EMAILS } from "./adminConfig";
 import "./Auth.css";
 
 /* ── Feature data ── */
@@ -98,16 +98,21 @@ const TESTIMONIALS = [
 function Auth() {
   /* ── State ── */
   const [step, setStep] = useState("role"); // "role" | "form"
-  const [role, setRole] = useState("");     // "student" | "faculty"
+  const [role, setRole] = useState("");     // "student" | "faculty" | "admin"
   const [isRegister, setIsRegister] = useState(false);
 
-  const [selectedFacultyProfile, setSelectedFacultyProfile] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [department, setDepartment] = useState("Computer Science & Engineering");
 
+  // Faculty specific fields
+  const [facultyId, setFacultyId] = useState("");
+  const [department, setDepartment] = useState("Computer Science & Engineering");
+  const [designation, setDesignation] = useState("Assistant Professor");
+  const [subjectsTaught, setSubjectsTaught] = useState("");
+
+  // Student specific fields
   const [section, setSection] = useState(defaultSection || "K25PS");
   const [customSection, setCustomSection] = useState("");
   const [isCustomSection, setIsCustomSection] = useState(false);
@@ -117,6 +122,8 @@ function Auth() {
 
   /* ── Helpers ── */
   const isFaculty = role === "faculty";
+  const isAdmin = role === "admin";
+  const isStudent = role === "student";
 
   const scrollToAuth = () => {
     document.getElementById("auth-panel-anchor")?.scrollIntoView({ behavior: "smooth" });
@@ -140,6 +147,9 @@ function Auth() {
   const handleRoleChoose = (chosenRole) => {
     setRole(chosenRole);
     setError("");
+    if (chosenRole === "admin") {
+      setIsRegister(false); // Admin has no registration
+    }
     setStep("form");
     scrollToAuth();
   };
@@ -152,17 +162,12 @@ function Auth() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
-    setSelectedFacultyProfile("");
+    setFacultyId("");
+    setDesignation("Assistant Professor");
+    setSubjectsTaught("");
     setSection(defaultSection || "K25PS");
     setCustomSection("");
     setIsCustomSection(false);
-  };
-
-  const handleFacultyProfileChange = (e) => {
-    const val = e.target.value;
-    setSelectedFacultyProfile(val);
-    if (val && val !== "custom") setName(val);
-    else if (val === "custom") setName("");
   };
 
   const handleSubmit = async (e) => {
@@ -170,9 +175,17 @@ function Auth() {
     setError("");
 
     if (isRegister) {
-      if (!name.trim()) { setError("Please enter your name."); return; }
+      if (!name.trim()) { setError("Please enter your full name."); return; }
       if (password !== confirmPassword) { setError("Passwords do not match."); return; }
       if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+
+      // Extra validations for faculty registration
+      if (isFaculty) {
+        if (!facultyId.trim()) { setError("Please enter your Official Faculty ID."); return; }
+        if (!department.trim()) { setError("Please enter your Department."); return; }
+        if (!designation.trim()) { setError("Please enter your Designation."); return; }
+        if (!subjectsTaught.trim()) { setError("Please list the subject(s) you teach."); return; }
+      }
     }
 
     const finalSection = isCustomSection
@@ -181,7 +194,8 @@ function Auth() {
 
     try {
       setLoading(true);
-      // Remember selected role so App.jsx can self-heal if profile doc is delayed
+
+      // Cache role for auto-healing
       try {
         sessionStorage.setItem("last_auth_role", role);
       } catch (err) {
@@ -189,52 +203,107 @@ function Auth() {
       }
 
       if (isRegister) {
+        // Prevent registration for admin
+        if (isAdmin) {
+          setError("Administrator accounts cannot be registered publicly.");
+          setLoading(false);
+          return;
+        }
+
         const result = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(result.user, { displayName: name.trim() });
-        await setDoc(doc(db, "users", result.user.uid), {
-          uid: result.user.uid,
-          name: name.trim(),
-          email: email.trim(),
-          role,
-          section: role === "student" ? finalSection : null,
-          facultyName: role === "faculty" ? name.trim() : null,
-          department: role === "faculty" ? department : null,
-          createdAt: serverTimestamp(),
-        });
+
+        if (isFaculty) {
+          // Faculty registration: status is PENDING APPROVAL
+          await setDoc(doc(db, "users", result.user.uid), {
+            uid: result.user.uid,
+            name: name.trim(),
+            email: email.trim(),
+            role: "faculty",
+            approvalStatus: "pending",
+            facultyId: facultyId.trim(),
+            department: department.trim(),
+            designation: designation.trim(),
+            subjectsTaught: subjectsTaught.trim(),
+            facultyName: name.trim(),
+            appliedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          // Student registration: automatically granted student role
+          await setDoc(doc(db, "users", result.user.uid), {
+            uid: result.user.uid,
+            name: name.trim(),
+            email: email.trim(),
+            role: "student",
+            section: finalSection,
+            createdAt: serverTimestamp(),
+          });
+        }
       } else {
-        // Sign-in: verify the account's role matches the selected portal
+        // ── Sign In ──
         const result = await signInWithEmailAndPassword(auth, email, password);
 
-        // Read the Firestore profile to check role
+        // Read Firestore profile
         const profileSnap = await getDoc(doc(db, "users", result.user.uid));
-        if (profileSnap.exists()) {
+        const emailLower = email.trim().toLowerCase();
+        const isAuthorizedInitialAdmin = INITIAL_ADMIN_EMAILS.includes(emailLower);
+
+        if (isAdmin) {
+          const profileData = profileSnap.exists() ? profileSnap.data() : null;
+          const isDbAdmin = profileData?.role === "admin";
+
+          if (!isDbAdmin && !isAuthorizedInitialAdmin) {
+            await signOut(auth);
+            setError("⚠️ Access Denied: You do not have administrator privileges.");
+            setLoading(false);
+            return;
+          }
+
+          // If authorized initial admin but document not marked admin yet, auto-provision
+          if (isAuthorizedInitialAdmin && !isDbAdmin) {
+            await setDoc(
+              doc(db, "users", result.user.uid),
+              {
+                uid: result.user.uid,
+                name: result.user.displayName || email.split("@")[0] || "Admin",
+                email: email.trim(),
+                role: "admin",
+                createdAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+        } else if (profileSnap.exists()) {
           const profileData = profileSnap.data();
-          // Mismatch: user chose wrong portal
+
+          // Role mismatch protection
           if (profileData.role && profileData.role !== role) {
             await signOut(auth);
-            setError(
-              profileData.role === "faculty"
-                ? "⚠️ This is a Faculty account. Please choose the Faculty Portal."
-                : "⚠️ This is a Student account. Please choose the Student Portal."
-            );
+            if (profileData.role === "admin") {
+              setError("This is an Administrator account. Please select the Administrator Portal.");
+            } else if (profileData.role === "faculty") {
+              setError("This is a Faculty account. Please choose the Faculty Portal.");
+            } else {
+              setError("This is a Student account. Please choose the Student Portal.");
+            }
             setLoading(false);
             return;
           }
         } else {
-          // Profile doc missing (legacy user) — create it right now with the chosen role!
+          // Auto-provision legacy profile doc if missing
           await setDoc(doc(db, "users", result.user.uid), {
             uid: result.user.uid,
             name: result.user.displayName || email.split("@")[0] || "User",
             email: email.trim(),
             role,
+            approvalStatus: role === "faculty" ? "pending" : null,
             section: role === "student" ? finalSection : null,
-            facultyName: role === "faculty" ? (result.user.displayName || email.split("@")[0]) : null,
-            department: role === "faculty" ? "Computer Science & Engineering" : null,
             createdAt: serverTimestamp(),
           });
         }
 
-        // Only update section for students on sign-in
+        // Update student section if changed on login
         if (role === "student" && finalSection) {
           await setDoc(
             doc(db, "users", result.user.uid),
@@ -293,6 +362,7 @@ function Auth() {
 
           {/* Portal cards */}
           <div className="auth-panel-role-cards">
+            {/* Student */}
             <button
               type="button"
               className="auth-panel-portal-card student-card"
@@ -308,6 +378,7 @@ function Auth() {
               <span className="auth-panel-portal-arrow">→</span>
             </button>
 
+            {/* Faculty */}
             <button
               type="button"
               className="auth-panel-portal-card faculty-card"
@@ -317,7 +388,23 @@ function Auth() {
               <div className="auth-panel-portal-body">
                 <span className="auth-panel-portal-title">Faculty Portal</span>
                 <span className="auth-panel-portal-desc">
-                  Review queries, respond, manage consultations
+                  {isRegister ? "Apply for faculty verification and dashboard access" : "Review student queries, respond, manage consultations"}
+                </span>
+              </div>
+              <span className="auth-panel-portal-arrow">→</span>
+            </button>
+
+            {/* Administrator (Sign In Only) */}
+            <button
+              type="button"
+              className="auth-panel-portal-card admin-card"
+              onClick={() => handleRoleChoose("admin")}
+            >
+              <div className="auth-panel-portal-icon">🛡️</div>
+              <div className="auth-panel-portal-body">
+                <span className="auth-panel-portal-title">Administrator Portal</span>
+                <span className="auth-panel-portal-desc">
+                  Verify faculty applications and supervise platform metrics
                 </span>
               </div>
               <span className="auth-panel-portal-arrow">→</span>
@@ -338,55 +425,56 @@ function Auth() {
             <button type="button" className="auth-panel-back-btn" onClick={handleBack}>
               ← Back
             </button>
-            <span className={`auth-panel-role-badge${isFaculty ? " faculty" : " student"}`}>
-              {isFaculty ? "👨‍🏫 Faculty Portal" : "🎓 Student Portal"}
+            <span className={`auth-panel-role-badge ${role}`}>
+              {isFaculty && "👨‍🏫 Faculty Portal"}
+              {isStudent && "🎓 Student Portal"}
+              {isAdmin && "🛡️ Administrator Portal"}
             </span>
           </div>
 
-          {/* Mode tabs */}
-          <div className="auth-panel-step-tabs" style={{ marginBottom: "20px" }}>
-            <button
-              type="button"
-              className={`auth-panel-mode-btn${!isRegister ? " active" : ""}`}
-              onClick={() => { setIsRegister(false); setError(""); }}
+          {/* Mode tabs (hidden for Admin, since admin is sign-in only) */}
+          {!isAdmin ? (
+            <div className="auth-panel-step-tabs" style={{ marginBottom: "20px" }}>
+              <button
+                type="button"
+                className={`auth-panel-mode-btn${!isRegister ? " active" : ""}`}
+                onClick={() => { setIsRegister(false); setError(""); }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`auth-panel-mode-btn${isRegister ? " active" : ""}`}
+                onClick={() => { setIsRegister(true); setError(""); }}
+              >
+                {isFaculty ? "Apply as Faculty" : "Register"}
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                background: "rgba(139, 92, 246, 0.12)",
+                border: "1px solid rgba(139, 92, 246, 0.3)",
+                borderRadius: "10px",
+                padding: "8px 12px",
+                fontSize: "12px",
+                color: "#ddd6fe",
+                marginBottom: "20px",
+                textAlign: "center",
+              }}
             >
-              Sign In
-            </button>
-            <button
-              type="button"
-              className={`auth-panel-mode-btn${isRegister ? " active" : ""}`}
-              onClick={() => { setIsRegister(true); setError(""); }}
-            >
-              Register
-            </button>
-          </div>
+              🛡️ Administrator Access • Authorized Personnel Only
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="auth-panel-form">
-
-            {/* Faculty roster (register only) */}
-            {isRegister && isFaculty && (
-              <div className="auth-panel-field-group">
-                <label className="auth-panel-label">SELECT FROM FACULTY ROSTER</label>
-                <select
-                  value={selectedFacultyProfile}
-                  onChange={handleFacultyProfileChange}
-                  className="auth-panel-select"
-                >
-                  <option value="">-- Choose your name from roster --</option>
-                  {allFaculty.map((fName) => (
-                    <option key={fName} value={fName}>{fName}</option>
-                  ))}
-                  <option value="custom">Other / Enter custom name</option>
-                </select>
-              </div>
-            )}
 
             {/* Name (register only) */}
             {isRegister && (
               <div className="auth-panel-field-group">
                 <label className="auth-panel-label">
-                  {isFaculty ? "FACULTY NAME" : "FULL NAME"}
+                  {isFaculty ? "FACULTY FULL NAME (WITH TITLE)" : "FULL NAME"}
                 </label>
                 <input
                   type="text"
@@ -399,8 +487,64 @@ function Auth() {
               </div>
             )}
 
+            {/* Faculty Specific Registration Fields */}
+            {isRegister && isFaculty && (
+              <>
+                <div className="auth-panel-field-group">
+                  <label className="auth-panel-label">OFFICIAL FACULTY ID</label>
+                  <input
+                    type="text"
+                    className="auth-panel-input"
+                    placeholder="e.g. FAC-CSE-2024"
+                    value={facultyId}
+                    onChange={(e) => setFacultyId(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="auth-panel-field-group">
+                  <label className="auth-panel-label">DESIGNATION</label>
+                  <select
+                    className="auth-panel-select"
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                  >
+                    <option value="Assistant Professor">Assistant Professor</option>
+                    <option value="Associate Professor">Associate Professor</option>
+                    <option value="Professor">Professor</option>
+                    <option value="Head of Department (HOD)">Head of Department (HOD)</option>
+                    <option value="Lecturer / Teaching Assistant">Lecturer / Teaching Assistant</option>
+                  </select>
+                </div>
+
+                <div className="auth-panel-field-group">
+                  <label className="auth-panel-label">DEPARTMENT</label>
+                  <input
+                    type="text"
+                    className="auth-panel-input"
+                    placeholder="e.g. Computer Science & Engineering"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="auth-panel-field-group">
+                  <label className="auth-panel-label">SUBJECTS TAUGHT</label>
+                  <input
+                    type="text"
+                    className="auth-panel-input"
+                    placeholder="e.g. OOPs (CSE202), DSA (CSE205)"
+                    value={subjectsTaught}
+                    onChange={(e) => setSubjectsTaught(e.target.value)}
+                    required
+                  />
+                </div>
+              </>
+            )}
+
             {/* Section (students — both sign-in and register) */}
-            {!isFaculty && (
+            {isStudent && (
               <div className="auth-panel-field-group">
                 <label className="auth-panel-label">
                   STUDENT SECTION {isRegister ? "(YOUR CLASS / BATCH)" : "(CLASS / BATCH)"}
@@ -435,27 +579,21 @@ function Auth() {
               </div>
             )}
 
-            {/* Department (faculty register only) */}
-            {isRegister && isFaculty && (
-              <div className="auth-panel-field-group">
-                <label className="auth-panel-label">DEPARTMENT</label>
-                <input
-                  type="text"
-                  className="auth-panel-input"
-                  placeholder="e.g. Computer Science & Engineering"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                />
-              </div>
-            )}
-
             {/* Email */}
             <div className="auth-panel-field-group">
-              <label className="auth-panel-label">EMAIL ADDRESS</label>
+              <label className="auth-panel-label">
+                {isFaculty ? "OFFICIAL FACULTY EMAIL" : isAdmin ? "ADMINISTRATOR EMAIL" : "EMAIL ADDRESS"}
+              </label>
               <input
                 type="email"
                 className="auth-panel-input"
-                placeholder={isFaculty ? "faculty@university.edu" : "student@university.edu"}
+                placeholder={
+                  isFaculty
+                    ? "professor@university.edu"
+                    : isAdmin
+                    ? "admin@university.edu"
+                    : "student@university.edu"
+                }
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -494,23 +632,33 @@ function Auth() {
 
             <button
               type="submit"
-              className={`auth-panel-submit${isFaculty ? " faculty-submit-btn" : ""}`}
+              className={`auth-panel-submit ${
+                isFaculty ? "faculty-submit-btn" : isAdmin ? "admin-submit-btn" : ""
+              }`}
               disabled={loading}
             >
               {loading
                 ? "Please wait..."
                 : isRegister
-                ? `Register as ${isFaculty ? "Faculty" : "Student"} →`
-                : `Sign In to ${isFaculty ? "Faculty" : "Student"} Portal →`}
+                ? isFaculty
+                  ? "Submit Faculty Application →"
+                  : "Register as Student →"
+                : isAdmin
+                ? "Sign In as Administrator →"
+                : isFaculty
+                ? "Sign In to Faculty Portal →"
+                : "Sign In to Student Portal →"}
             </button>
           </form>
 
-          <p className="auth-panel-switch">
-            {isRegister ? "Already registered?" : "New to AskMyFaculty?"}
-            <span onClick={() => { setIsRegister(!isRegister); setError(""); }}>
-              {isRegister ? " Sign In" : " Create Account"}
-            </span>
-          </p>
+          {!isAdmin && (
+            <p className="auth-panel-switch">
+              {isRegister ? "Already registered?" : "New to AskMyFaculty?"}
+              <span onClick={() => { setIsRegister(!isRegister); setError(""); }}>
+                {isRegister ? " Sign In" : isFaculty ? " Apply as Faculty" : " Create Account"}
+              </span>
+            </p>
+          )}
         </>
       )}
     </div>
@@ -521,7 +669,6 @@ function Auth() {
   ══════════════════════════════════════ */
   return (
     <div className="landing-root">
-
       {/* ── Fixed Top Navbar ── */}
       <nav className="landing-navbar">
         <div className="landing-nav-brand">
@@ -547,10 +694,8 @@ function Auth() {
 
       {/* ── Split Layout ── */}
       <div className="landing-split-layout">
-
         {/* ══ LEFT — Landing Content ══ */}
         <div className="landing-content-side">
-
           {/* Hero */}
           <section className="landing-hero">
             <span className="hero-launch-badge">
@@ -680,7 +825,6 @@ function Auth() {
         <div className="landing-auth-side">
           {renderAuthPanel()}
         </div>
-
       </div>
     </div>
   );

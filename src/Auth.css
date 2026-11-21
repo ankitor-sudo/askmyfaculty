@@ -717,6 +717,12 @@
   box-shadow: 0 6px 20px rgba(5, 150, 105, 0.14);
 }
 
+.auth-panel-portal-card.admin-card:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.14);
+}
+
 .auth-panel-portal-icon {
   width: 44px;
   height: 44px;
@@ -804,6 +810,12 @@
   background: rgba(5, 150, 105, 0.15);
   border: 1px solid rgba(5, 150, 105, 0.35);
   color: #34d399;
+}
+
+.auth-panel-role-badge.admin {
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #c4b5fd;
 }
 
 /* Auth Form */
@@ -904,6 +916,16 @@
 .faculty-submit-btn:hover:not(:disabled) {
   background: linear-gradient(135deg, #047857, #059669) !important;
   box-shadow: 0 8px 26px rgba(5, 150, 105, 0.4) !important;
+}
+
+.admin-submit-btn {
+  background: linear-gradient(135deg, #7c3aed, #ec4899) !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35) !important;
+}
+
+.admin-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6d28d9, #db2777) !important;
+  box-shadow: 0 8px 26px rgba(124, 58, 237, 0.45) !important;
 }
 
 /* Switch link */
